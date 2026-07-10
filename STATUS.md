@@ -1,11 +1,11 @@
 # Starless + EasySharp training status
 
-updated 2026-07-11 00:28
+updated 2026-07-11 00:29
 
 queue of 2 experiments
-## RUNNING: orch_star (attempt 1, started 2026-07-11 00:28)
+## RUNNING: orch_star (2026-07-11 00:29)
 
-latest sample: `runs/smoke/samples/step0000200_s2.tif`
+latest sample: `runs/orch_star/samples/step0000150_s2.tif`
 
 ![progress](progress.jpg)
 
