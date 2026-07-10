@@ -29,12 +29,45 @@ def now():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
-def push_status(lines):
-    with open(STATUS, "w", encoding="utf-8") as f:
-        f.write(f"# Starless training status\n\nupdated {now()}\n\n"
-                + "\n".join(lines) + "\n")
+def latest_sample_thumb():
+    """Newest training sample -> small progress.jpg in the repo root, so the
+    owner can eyeball quality from GitHub on their phone. Best-effort."""
     try:
-        subprocess.run(["git", "add", "STATUS.md"], cwd=ROOT, capture_output=True)
+        import glob
+        from PIL import Image
+        import numpy as np
+        import tifffile
+        tifs = glob.glob(os.path.join(ROOT, "runs", "*", "samples", "*.tif"))
+        if not tifs:
+            return
+        newest = max(tifs, key=os.path.getmtime)
+        arr = tifffile.imread(newest).astype(np.float32)
+        if arr.max() > 1.5:
+            arr /= 65535.0
+        # gentle stretch so faint structure is visible in the thumbnail
+        arr = np.clip(arr, 0, 1) ** 0.45
+        im = Image.fromarray((arr * 255).astype("uint8"))
+        w = 1400
+        im = im.resize((w, int(im.height * w / im.width)))
+        im.save(os.path.join(ROOT, "progress.jpg"), quality=80)
+        return os.path.relpath(newest, ROOT).replace("\\", "/")
+    except Exception:
+        return None
+
+
+def push_status(lines):
+    thumb = latest_sample_thumb()
+    with open(STATUS, "w", encoding="utf-8") as f:
+        f.write(f"# Starless + EasySharp training status\n\nupdated {now()}\n\n"
+                + "\n".join(lines) + "\n\n")
+        if thumb:
+            f.write(f"latest sample: `{thumb}`\n\n"
+                    "![progress](progress.jpg)\n\n"
+                    "_panel = input | model output | ground truth "
+                    "(left to right)_\n")
+    try:
+        subprocess.run(["git", "add", "STATUS.md", "progress.jpg"], cwd=ROOT,
+                       capture_output=True)
         subprocess.run(["git", "commit", "-m", f"status {now()}"],
                        cwd=ROOT, capture_output=True)
         r = subprocess.run(["git", "push"], cwd=ROOT, capture_output=True,

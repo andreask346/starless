@@ -4,5 +4,4 @@ __pycache__/
 *.onnx
 datagen/backgrounds/
 datagen/bg_prep.*
-STATUS.md
 STOP
