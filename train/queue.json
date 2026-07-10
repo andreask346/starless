@@ -1,22 +1,26 @@
 [
   {
-    "name": "w32_base",
+    "name": "star_w32",
+    "task": "star",
     "args": { "width": 32, "crop": 256, "batch": 16, "iters": 200000,
               "workers": 10, "bg-dir": "datagen/backgrounds" }
   },
   {
-    "name": "w32_noffc",
+    "name": "sharp_w32",
+    "task": "sharp",
     "args": { "width": 32, "crop": 256, "batch": 16, "iters": 200000,
-              "workers": 10, "bg-dir": "datagen/backgrounds", "no-ffc": true }
+              "workers": 10 }
   },
   {
-    "name": "w64_ship",
+    "name": "star_w64_ship",
+    "task": "star",
     "args": { "width": 64, "crop": 256, "batch": 16, "iters": 400000,
               "workers": 10, "bg-dir": "datagen/backgrounds" }
   },
   {
-    "name": "w32_crop384",
-    "args": { "width": 32, "crop": 384, "batch": 8, "iters": 150000,
-              "workers": 10, "bg-dir": "datagen/backgrounds" }
+    "name": "sharp_w64_ship",
+    "task": "sharp",
+    "args": { "width": 64, "crop": 256, "batch": 16, "iters": 400000,
+              "workers": 10 }
   }
 ]

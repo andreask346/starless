@@ -54,7 +54,8 @@ def tail_log(run_name, n=3):
 
 def run_experiment(exp, done, all_lines):
     name = exp["name"]
-    args = [PY, os.path.join(ROOT, "train", "train.py"), "--name", name,
+    script = "train_sharp.py" if exp.get("task") == "sharp" else "train.py"
+    args = [PY, os.path.join(ROOT, "train", script), "--name", name,
             "--resume"]
     for k, v in exp.get("args", {}).items():
         args += [f"--{k}", str(v)] if v is not True else [f"--{k}"]
@@ -95,14 +96,18 @@ def run_experiment(exp, done, all_lines):
 
 def post_steps(exp, lines):
     name = exp["name"]
+    sharp = exp.get("task") == "sharp"
     best = os.path.join(ROOT, "runs", name, "best.pt")
     onnx = os.path.join(ROOT, "runs", name, f"{name}.onnx")
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
-    r1 = subprocess.run([PY, os.path.join(ROOT, "export", "export_onnx.py"),
-                         best, onnx], cwd=ROOT, env=env,
-                        capture_output=True, text=True, timeout=1800)
+    exp_cmd = [PY, os.path.join(ROOT, "export", "export_onnx.py"), best, onnx]
+    if sharp:
+        exp_cmd.append("--sharp")
+    r1 = subprocess.run(exp_cmd, cwd=ROOT, env=env, capture_output=True,
+                        text=True, timeout=1800)
     lines.append(f"- export: {'ok' if r1.returncode == 0 else 'FAILED'}")
-    r2 = subprocess.run([PY, os.path.join(ROOT, "eval", "panel.py"), best],
+    panel = "panel_sharp.py" if sharp else "panel.py"
+    r2 = subprocess.run([PY, os.path.join(ROOT, "eval", panel), best],
                         cwd=ROOT, env=env, capture_output=True, text=True,
                         timeout=7200)
     metric_line = next((ln for ln in r2.stdout.splitlines()
