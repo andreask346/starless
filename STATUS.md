@@ -9,7 +9,8 @@ queue of 2 experiments
 ## orch_sharp: ok (0.0 h)
 - export: ok
 - eval: {"psnr": 28.7501, "flux": 3.6555, "reblur": 0.0127, "ident": 0.0212, "panels": ["sharp_DS.tif", "sharp_Stacked.tif", "sharp_7IV01626.tif", "sharp_7IV01627.tif", "sharp_(1)_20260520113330.tif", "sharp_(10)_20260520113355.tif"], "step": 150}
--- queue complete
+
+queue exited 2026-07-11 00:30
 
 latest sample: `runs/orch_sharp/samples/step0000150_s2.tif`
 
