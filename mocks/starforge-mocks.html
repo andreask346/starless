@@ -1,0 +1,82 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>StarForge — visual mocks</title>
+<style>
+  body{background:#14161a;color:#d8dce2;font-family:'Segoe UI',sans-serif;margin:0;padding:32px;display:flex;flex-direction:column;gap:40px;align-items:center}
+  h1{font-size:20px;color:#fff;margin:0}
+  .cap{color:#8b93a1;font-size:13px;margin:4px 0 12px}
+  .win{background:#1e2127;border:1px solid #32363e;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);width:620px;overflow:hidden}
+  .tbar{background:#262a31;padding:9px 14px;font-size:13px;color:#aeb6c2;display:flex;justify-content:space-between}
+  .body{padding:18px}
+  .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#7d8594;margin:14px 0 6px}
+  .field{background:#14161a;border:1px solid #32363e;border-radius:6px;padding:8px 10px;font-size:13px;display:flex;justify-content:space-between}
+  .btn{background:#2c313a;border:1px solid #444a56;border-radius:6px;padding:6px 14px;font-size:12px;display:inline-block}
+  .btn.primary{background:#3d6ef7;border-color:#3d6ef7;color:#fff;font-weight:600;padding:9px 22px;font-size:13px}
+  .opt{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;align-items:center}
+  .opt label{display:flex;gap:6px;align-items:center;color:#aeb6c2}
+  .check{width:13px;height:13px;border-radius:3px;background:#3d6ef7;display:inline-block}
+  .slider{width:170px;height:4px;background:#2c313a;border-radius:2px;position:relative;display:inline-block}
+  .slider i{position:absolute;left:60%;top:-5px;width:14px;height:14px;border-radius:7px;background:#3d6ef7}
+  .tag{font-size:11px;border-radius:4px;padding:1px 8px}
+  .ok{background:#0e3d24;color:#4ade80}
+  .mono{font-family:Consolas,monospace}
+</style></head><body>
+
+<div>
+<h1>Mock 1 — Star removal (Tool A)</h1>
+<div class="cap">Scripts menu → star removal. GPU auto-detected, exact recomposition guaranteed.</div>
+<div class="win">
+  <div class="tbar"><span>StarForge — star removal</span><span>— □ ✕</span></div>
+  <div class="body">
+    <div class="lbl">Input</div>
+    <div class="field"><span>Currently loaded image (RGB_stack.fit, 7008×4672)</span><span class="btn">Pick file…</span></div>
+    <div class="opt" style="margin-top:12px">
+      <label><span class="check"></span> Starless image</label>
+      <label><span class="check"></span> Star layer (starless + stars = original, exact)</label>
+      <label><span class="check"></span> Noise-matched infill</label>
+    </div>
+    <div class="lbl">Data type</div>
+    <div class="opt">
+      <label><b style="color:#d8dce2">Auto</b> ▾ (linear / stretched detected)</label>
+      <label style="margin-left:20px">Engine: <b style="color:#4ade80">GPU (RTX 4090, DirectML)</b></label>
+    </div>
+    <div style="margin-top:18px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:#7d8594">model v0.3 · 512px tiles, feathered · ~4 s expected</span>
+      <span class="btn primary">▶ Remove stars</span>
+    </div>
+    <div class="lbl" style="margin-top:14px">After run — verification (no other tool shows this)</div>
+    <div class="opt mono" style="font-size:12px;color:#aeb6c2">
+      <span class="tag ok">recomposition 63.1 dB</span>
+      <span class="tag ok">idempotent ✓</span>
+      <span class="tag ok">star-layer leakage 0.2%</span>
+      <span>report.html</span>
+    </div>
+  </div>
+</div>
+</div>
+
+<div>
+<h1>Mock 2 — AI deconvolution (Tool B)</h1>
+<div class="cap">PSF measured from YOUR stars (EasyReg detector) — the model adapts to your optics.</div>
+<div class="win">
+  <div class="tbar"><span>StarForge — deconvolution</span><span>— □ ✕</span></div>
+  <div class="body">
+    <div class="lbl">Measured PSF (auto, from 412 stars)</div>
+    <div class="field mono"><span>FWHM 3.4px · Moffat β 2.6 · corner elongation 18% (coma)</span><span class="btn">Re-measure</span></div>
+    <div class="lbl">Sharpening</div>
+    <div class="opt">
+      <label>Stars: <span class="slider"><i></i></span> <span class="mono">0.55</span></label>
+      <label>Detail: <span class="slider"><i style="left:40%"></i></span> <span class="mono">0.40</span></label>
+    </div>
+    <div class="opt" style="margin-top:10px">
+      <label><span class="check"></span> Correct aberrations only (no sharpening)</label>
+      <label><span class="check" style="background:#2c313a;border:1px solid #444a56"></span> Luminance only</label>
+    </div>
+    <div style="margin-top:18px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:#7d8594">honesty report: flux Δ 0.8% · no invented detail (round-trip ✓)</span>
+      <span class="btn primary">▶ Sharpen</span>
+    </div>
+  </div>
+</div>
+</div>
+
+</body></html>
