@@ -6,7 +6,10 @@ queue of 2 experiments
 ## orch_star: ok (0.0 h)
 - export: ok
 - eval: {"psnr_in": 37.09, "psnr_out": NaN, "leak": NaN, "recomp": 179.26, "completeness": {"faint": 0.0, "mid": 0.0, "bright": 0.0}, "panels": ["panel_DS.tif", "panel_Stacked.tif", "panel_7IV01626.tif", "panel_7IV01627.tif", "panel_(1)_20260520113330.tif", "panel_(10)_20260520113355.tif"], "step": 
-## RUNNING: orch_sharp (2026-07-11 00:30)
+## orch_sharp: ok (0.0 h)
+- export: ok
+- eval: {"psnr": 28.7501, "flux": 3.6555, "reblur": 0.0127, "ident": 0.0212, "panels": ["sharp_DS.tif", "sharp_Stacked.tif", "sharp_7IV01626.tif", "sharp_7IV01627.tif", "sharp_(1)_20260520113330.tif", "sharp_(10)_20260520113355.tif"], "step": 150}
+-- queue complete
 
 latest sample: `runs/orch_sharp/samples/step0000150_s2.tif`
 
