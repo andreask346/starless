@@ -16,8 +16,10 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.dirname(__file__))
 from datagen.synth import PairDataset          # noqa: E402
 from models.nafnet_star import build           # noqa: E402
+from trainutils import atomic_save, safe_load, NaNGuard   # noqa: E402
 
 
 def charbonnier(a, b, eps=1e-3):
@@ -48,6 +50,7 @@ def quick_eval(model, device, crop=256, n=16):
     from datagen.synth import make_pair
     model.eval()
     tot_in, tot_out = 0.0, 0.0
+    n_in, n_out = 0, 0
     for i in range(n):
         inp, sl, st = make_pair(crop, crop, None, seed=10_000_000 + i,
                                 device=device)
@@ -56,10 +59,13 @@ def quick_eval(model, device, crop=256, n=16):
         foot = st > 1e-4
         if foot.any():
             tot_in += F.mse_loss(starless[foot], sl[foot]).item()
-        tot_out += F.mse_loss(starless[~foot], sl[~foot]).item()
+            n_in += 1
+        if (~foot).any():
+            tot_out += F.mse_loss(starless[~foot], sl[~foot]).item()
+            n_out += 1
     model.train()
-    psnr_in = -10 * math.log10(max(tot_in / n, 1e-12))
-    psnr_out = -10 * math.log10(max(tot_out / n, 1e-12))
+    psnr_in = -10 * math.log10(max(tot_in / max(n_in, 1), 1e-12))
+    psnr_out = -10 * math.log10(max(tot_out / max(n_out, 1), 1e-12))
     return psnr_in, psnr_out
 
 
@@ -112,17 +118,23 @@ def main():
         opt, T_max=args.iters, eta_min=1e-6)
 
     start = 0
+    best_in = -1
     ckpt_path = os.path.join(run_dir, "last.pt")
-    if args.resume and os.path.isfile(ckpt_path):
-        ck = torch.load(ckpt_path, map_location=device, weights_only=True)
-        model.load_state_dict(ck["model"])
-        opt.load_state_dict(ck["opt"])
-        sched.load_state_dict(ck["sched"])
-        start = ck["step"]
-        print(f"resumed {args.name} at step {start}", flush=True)
+    if args.resume:
+        ck = safe_load(ckpt_path, device)
+        if ck is not None:
+            model.load_state_dict(ck["model"])
+            opt.load_state_dict(ck["opt"])
+            sched.load_state_dict(ck["sched"])
+            start = ck["step"]
+            best_in = ck.get("best_in", -1)     # don't clobber best.pt on retry
+            print(f"resumed {args.name} at step {start} "
+                  f"(best {best_in:.2f})", flush=True)
 
+    # seed the on-the-fly data stream from the ABSOLUTE step so a resume
+    # continues the stream instead of replaying the first `start` steps
     ds = PairDataset(bg_dir=args.bg_dir or None, crop=args.crop,
-                     length=10_000_000)
+                     length=10_000_000, base_index=start * args.batch)
     dl = DataLoader(ds, batch_size=args.batch, num_workers=args.workers,
                     pin_memory=True, persistent_workers=args.workers > 0)
     it = iter(dl)
@@ -131,7 +143,7 @@ def main():
           f"bf16, batch={args.batch}@{args.crop}", flush=True)
     log_path = os.path.join(run_dir, "log.jsonl")
     t0 = time.time()
-    best_in = -1
+    guard = NaNGuard()
     model.train()
     for step in range(start, args.iters):
         try:
@@ -144,6 +156,9 @@ def main():
                             enabled=device == "cuda"):
             pred = model(inp)
             loss, parts = loss_fn(pred, inp, sl, st)
+        if not guard.check(loss):          # non-finite: skip, don't poison
+            opt.zero_grad(set_to_none=True)
+            continue
         opt.zero_grad(set_to_none=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -164,14 +179,19 @@ def main():
             pin, pout = quick_eval(model, device, crop=args.crop)
             print(f"eval step {step+1}: PSNR in-footprint {pin:.2f} dB / "
                   f"background {pout:.2f} dB", flush=True)
-            torch.save(dict(model=model.state_dict(), opt=opt.state_dict(),
-                            sched=sched.state_dict(), step=step + 1,
-                            config=vars(args)), ckpt_path)
-            if pin > best_in:
+            if os.path.isfile(ckpt_path):       # rotate for safe_load fallback
+                try:
+                    os.replace(ckpt_path, ckpt_path + ".prev")
+                except OSError:
+                    pass
+            atomic_save(dict(model=model.state_dict(), opt=opt.state_dict(),
+                             sched=sched.state_dict(), step=step + 1,
+                             best_in=best_in, config=vars(args)), ckpt_path)
+            if math.isfinite(pin) and pin > best_in:
                 best_in = pin
-                torch.save(dict(model=model.state_dict(), step=step + 1,
-                                config=vars(args)),
-                           os.path.join(run_dir, "best.pt"))
+                atomic_save(dict(model=model.state_dict(), step=step + 1,
+                                 config=vars(args)),
+                            os.path.join(run_dir, "best.pt"))
             save_samples(model, device, os.path.join(run_dir, "samples"),
                          step + 1)
     print("done", flush=True)

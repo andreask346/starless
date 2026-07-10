@@ -335,23 +335,25 @@ class PairDataset(torch.utils.data.Dataset):
     """On-the-fly pairs over a folder of linear starless background tiles
     (float32 .npy, (3,H,W), values 0..1). Empty folder -> fully procedural."""
 
-    def __init__(self, bg_dir=None, crop=256, length=100000, device="cpu"):
+    def __init__(self, bg_dir=None, crop=256, length=100000, device="cpu",
+                 base_index=0):
         import glob
         import os
         self.crop = crop
         self.length = length
         self.device = device
+        self.base = base_index          # absolute-step offset for resume
         self.bgs = sorted(glob.glob(os.path.join(bg_dir, "*.npy"))) \
             if bg_dir else []
 
     def __len__(self):
         return self.length
 
-    def _bg_crop(self, idx, gen):
+    def _bg_crop(self, j, gen):
         import numpy as np
         if not self.bgs or torch.rand(1, generator=gen).item() < 0.25:
             return None
-        arr = np.load(self.bgs[idx % len(self.bgs)], mmap_mode="r")
+        arr = np.load(self.bgs[j % len(self.bgs)], mmap_mode="r")
         c, h, w = arr.shape
         if h < self.crop or w < self.crop:
             return None
@@ -367,8 +369,9 @@ class PairDataset(torch.utils.data.Dataset):
         return t.clamp(0, 1)
 
     def __getitem__(self, i):
-        gen = torch.Generator().manual_seed(i * 9973 + 12345)
-        bg = self._bg_crop(i, gen)
+        j = self.base + i                        # absolute sample index
+        gen = torch.Generator().manual_seed(j * 9973 + 12345)
+        bg = self._bg_crop(j, gen)
         inp, starless, stars = make_pair(self.crop, self.crop, bg,
-                                         seed=i * 7919 + 7, device=self.device)
+                                         seed=j * 7919 + 7, device=self.device)
         return inp, starless, stars

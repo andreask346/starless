@@ -63,11 +63,15 @@ def zernike_kernel(size, coeffs, device):
 def sample_degradation(gen, device):
     """One degradation PSF per training image. Returns (kernel, cond vector)."""
     ksize = 33
-    fwhm = _loguniform(2.2, 9.0, 1, gen=gen).item()      # input FWHM
+    # FWHM floor at PSF_REF so cond[0]>=1 covers the sharpening regime the
+    # tool sees at inference (measure_psf reports fwhm/PSF_REF, often ~0.8-2)
+    fwhm = _loguniform(PSF_REF, 9.0, 1, gen=gen).item()  # input FWHM
     beta = _rand(1.8, 4.5, 1, gen=gen).item()
-    elong = _rand(0.0, 0.4, 1, gen=gen).item()
-    theta = _rand(0, math.pi, 1, gen=gen).item()
-    core = moffat_stamp(ksize, fwhm * (1 + elong), fwhm, theta, beta, device)
+    elong = _rand(0.0, 0.4, 1, gen=gen).item()           # = 1 - b/a (matches
+    theta = _rand(0, math.pi, 1, gen=gen).item()         # measure_psf's def)
+    # elong defined as 1-b/a: major axis = fwhm/(1-elong), minor = fwhm
+    core = moffat_stamp(ksize, fwhm / max(1 - elong, 0.5), fwhm, theta,
+                        beta, device)
     kernel = core
     spike_frac = 0.0
     if torch.rand(1, generator=gen).item() < 0.3:        # spikes on some
@@ -152,12 +156,14 @@ class SharpDataset(torch.utils.data.Dataset):
     (their sharpest data) can seed scenes, but default is fully synthetic
     for clean ground truth."""
 
-    def __init__(self, ref_dir=None, crop=256, length=100000, device="cpu"):
+    def __init__(self, ref_dir=None, crop=256, length=100000, device="cpu",
+                 base_index=0):
         import glob
         import os
         self.crop = crop
         self.length = length
         self.device = device
+        self.base = base_index
         self.refs = sorted(glob.glob(os.path.join(ref_dir, "*.npy"))) \
             if ref_dir else []
 
@@ -165,6 +171,7 @@ class SharpDataset(torch.utils.data.Dataset):
         return self.length
 
     def __getitem__(self, i):
+        j = self.base + i
         inp, tgt, cond, kernel, reblur = make_pair(
-            self.crop, self.crop, None, seed=i * 6271 + 3, device=self.device)
+            self.crop, self.crop, None, seed=j * 6271 + 3, device=self.device)
         return inp, tgt, cond, kernel, reblur

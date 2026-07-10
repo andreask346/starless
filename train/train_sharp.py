@@ -18,8 +18,10 @@ from torch.utils.data import DataLoader
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "datagen"))
+sys.path.insert(0, os.path.dirname(__file__))
 from blur import SharpDataset, conv_psf, make_pair   # noqa: E402
 from models.nafnet_sharp import build                # noqa: E402
+from trainutils import atomic_save, safe_load, NaNGuard   # noqa: E402
 
 
 def charbonnier(a, b, eps=1e-3):
@@ -118,17 +120,21 @@ def main():
         opt, T_max=args.iters, eta_min=1e-6)
 
     start = 0
+    best = -1
     ckpt = os.path.join(run_dir, "last.pt")
-    if args.resume and os.path.isfile(ckpt):
-        ck = torch.load(ckpt, map_location=device, weights_only=True)
-        model.load_state_dict(ck["model"])
-        opt.load_state_dict(ck["opt"])
-        sched.load_state_dict(ck["sched"])
-        start = ck["step"]
-        print(f"resumed {args.name} at step {start}", flush=True)
+    if args.resume:
+        ck = safe_load(ckpt, device)
+        if ck is not None:
+            model.load_state_dict(ck["model"])
+            opt.load_state_dict(ck["opt"])
+            sched.load_state_dict(ck["sched"])
+            start = ck["step"]
+            best = ck.get("best", -1)
+            print(f"resumed {args.name} at step {start} "
+                  f"(best {best:.2f})", flush=True)
 
     ds = SharpDataset(ref_dir=args.ref_dir or None, crop=args.crop,
-                      length=10_000_000)
+                      length=10_000_000, base_index=start * args.batch)
     dl = DataLoader(ds, batch_size=args.batch, num_workers=args.workers,
                     pin_memory=True, persistent_workers=args.workers > 0)
     it = iter(dl)
@@ -136,7 +142,7 @@ def main():
           f"device={device}, bf16, batch={args.batch}@{args.crop}", flush=True)
     log_path = os.path.join(run_dir, "log.jsonl")
     t0 = time.time()
-    best = -1
+    guard = NaNGuard()
     model.train()
     for step in range(start, args.iters):
         try:
@@ -151,6 +157,9 @@ def main():
                             enabled=device == "cuda"):
             out = model(inp, cond)
             loss, parts = loss_fn(out, tgt, kernel, reblur)
+        if not guard.check(loss):
+            opt.zero_grad(set_to_none=True)
+            continue
         opt.zero_grad(set_to_none=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -169,14 +178,19 @@ def main():
             psnr, flux = quick_eval(model, device, crop=args.crop)
             print(f"eval step {step+1}: PSNR {psnr:.2f} dB / flux err "
                   f"{flux:.2f}%", flush=True)
-            torch.save(dict(model=model.state_dict(), opt=opt.state_dict(),
-                            sched=sched.state_dict(), step=step + 1,
-                            config=vars(args)), ckpt)
-            if psnr > best:
+            if os.path.isfile(ckpt):
+                try:
+                    os.replace(ckpt, ckpt + ".prev")
+                except OSError:
+                    pass
+            atomic_save(dict(model=model.state_dict(), opt=opt.state_dict(),
+                             sched=sched.state_dict(), step=step + 1,
+                             best=best, config=vars(args)), ckpt)
+            if math.isfinite(psnr) and psnr > best:
                 best = psnr
-                torch.save(dict(model=model.state_dict(), step=step + 1,
-                                config=vars(args)),
-                           os.path.join(run_dir, "best.pt"))
+                atomic_save(dict(model=model.state_dict(), step=step + 1,
+                                 config=vars(args)),
+                            os.path.join(run_dir, "best.pt"))
             save_samples(model, device, os.path.join(run_dir, "samples"),
                          step + 1)
     print("done", flush=True)

@@ -101,22 +101,39 @@ def run_experiment(exp, done, all_lines):
                          f"started {started})"]
         push_status(done + all_lines_hdr + tail_log(name))
         env = dict(os.environ, PYTHONIOENCODING="utf-8")
+        log_file = os.path.join(ROOT, "runs", name, "log.jsonl")
+        log_mtime = os.path.getmtime(log_file) if os.path.isfile(log_file) else 0
+        stall_start = time.time()
         proc = subprocess.Popen(args, cwd=ROOT, env=env,
                                 stdout=subprocess.DEVNULL,
                                 stderr=subprocess.STDOUT)
-        # heartbeat loop: status push every 30 min while training
+
+        def _kill():
+            proc.terminate()
+            try:
+                proc.wait(timeout=120)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
+        # heartbeat: status push every 30 min; watchdog kills a hung run
         while proc.poll() is None:
             for _ in range(180):                    # 30 min in 10s slices
                 time.sleep(10)
                 if proc.poll() is not None:
                     break
                 if os.path.exists(STOP):
-                    proc.terminate()
-                    try:
-                        proc.wait(timeout=120)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
+                    _kill()
                     return "stopped"
+                # progress watchdog: log.jsonl advances every 200 steps;
+                # no growth for 45 min => hung (deadlock/driver stall) -> kill
+                m = os.path.getmtime(log_file) if os.path.isfile(log_file) else 0
+                if m > log_mtime:
+                    log_mtime = m
+                    stall_start = time.time()
+                elif time.time() - stall_start > 2700:
+                    print(f"watchdog: {name} stalled 45 min, killing", flush=True)
+                    _kill()
+                    break
             push_status(done + [f"## RUNNING: {name} ({now()})"]
                         + tail_log(name))
         if proc.returncode == 0:
@@ -136,9 +153,13 @@ def post_steps(exp, lines):
     exp_cmd = [PY, os.path.join(ROOT, "export", "export_onnx.py"), best, onnx]
     if sharp:
         exp_cmd.append("--sharp")
+    if not os.path.isfile(best):
+        lines.append("- export: SKIPPED (no best.pt produced)")
+        return False
     r1 = subprocess.run(exp_cmd, cwd=ROOT, env=env, capture_output=True,
                         text=True, timeout=1800)
-    lines.append(f"- export: {'ok' if r1.returncode == 0 else 'FAILED'}")
+    exp_ok = r1.returncode == 0
+    lines.append(f"- export: {'ok' if exp_ok else 'FAILED'}")
     panel = "panel_sharp.py" if sharp else "panel.py"
     r2 = subprocess.run([PY, os.path.join(ROOT, "eval", panel), best],
                         cwd=ROOT, env=env, capture_output=True, text=True,
@@ -146,10 +167,11 @@ def post_steps(exp, lines):
     metric_line = next((ln for ln in r2.stdout.splitlines()
                         if ln.startswith("METRICS ")), "")
     lines.append(f"- eval: {metric_line[8:300] if metric_line else 'FAILED'}")
+    return exp_ok and bool(metric_line)         # gate the DONE marker
 
 
 def main():
-    exps = json.load(open(QUEUE))
+    exps = json.load(open(QUEUE, encoding="utf-8-sig"))   # tolerate BOM
     done = [f"queue of {len(exps)} experiments"]
     for i, exp in enumerate(exps):
         if os.path.exists(STOP):
@@ -164,8 +186,12 @@ def main():
         hours = (time.time() - t0) / 3600
         lines = [f"## {exp['name']}: {result} ({hours:.1f} h)"]
         if result == "ok":
-            post_steps(exp, lines)
-            open(marker, "w").write(now())
+            ok = post_steps(exp, lines)
+            if ok:                              # only mark DONE if it produced
+                open(marker, "w").write(now())  # a valid, exported, eval'd model
+            else:
+                lines.append("- NOT marked done (post-steps incomplete) - "
+                             "will re-run on restart")
         done += lines
         push_status(done + [f"-- next: {exps[i+1]['name']}"
                             if i + 1 < len(exps) else "-- queue complete"])
