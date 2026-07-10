@@ -179,6 +179,11 @@ def main():
             pin, pout = quick_eval(model, device, crop=args.crop)
             print(f"eval step {step+1}: PSNR in-footprint {pin:.2f} dB / "
                   f"background {pout:.2f} dB", flush=True)
+            # also write eval to log.jsonl so it surfaces in STATUS.md / phone
+            with open(log_path, "a") as f:
+                f.write(json.dumps(dict(eval_step=step + 1,
+                                        psnr_stars=round(pin, 2),
+                                        psnr_bg=round(pout, 2))) + "\n")
             if os.path.isfile(ckpt_path):       # rotate for safe_load fallback
                 try:
                     os.replace(ckpt_path, ckpt_path + ".prev")

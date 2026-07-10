@@ -178,6 +178,10 @@ def main():
             psnr, flux = quick_eval(model, device, crop=args.crop)
             print(f"eval step {step+1}: PSNR {psnr:.2f} dB / flux err "
                   f"{flux:.2f}%", flush=True)
+            with open(log_path, "a") as f:
+                f.write(json.dumps(dict(eval_step=step + 1,
+                                        psnr=round(psnr, 2),
+                                        flux_err=round(flux, 2))) + "\n")
             if os.path.isfile(ckpt):
                 try:
                     os.replace(ckpt, ckpt + ".prev")
