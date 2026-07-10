@@ -1,4 +1,4 @@
-# StarForge (working name) — Build Plan
+# Starless & EasySharp — Build Plan
 
 **Two open AI tools for Siril, one training platform, built to beat the commercial incumbents:**
 
@@ -51,6 +51,6 @@ The machine trains overnight/weekends; iterations are recipe changes, not code r
 
 ## Open decisions (Andreas)
 
-1. **Names** — working name "StarForge" for the platform. Tool names? (e.g. EasyStar / EasySharp to match EasyReg; or StarForge / SharpForge; your call — veto welcome, cheap to change before the repo goes up.)
+1. **Names** — working name "Starless" for the platform. Tool names? (e.g. EasyStar / EasySharp to match EasyReg; or Starless / SharpForge; your call — veto welcome, cheap to change before the repo goes up.)
 2. **GPU time** — phases 2–4 run multi-hour/overnight training on your 4090 repeatedly. OK to own the box at night?
 3. **Go/no-go per phase** — Phase 1+2 first, judge Tool A v0 results on your own images, then commit onward.
