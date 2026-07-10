@@ -2,25 +2,25 @@
   {
     "name": "star_w32",
     "task": "star",
-    "args": { "width": 32, "crop": 256, "batch": 16, "iters": 200000,
+    "args": { "width": 32, "crop": 256, "batch": 16, "iters": 80000,
               "workers": 10, "bg-dir": "datagen/backgrounds" }
   },
   {
     "name": "sharp_w32",
     "task": "sharp",
-    "args": { "width": 32, "crop": 256, "batch": 16, "iters": 200000,
+    "args": { "width": 32, "crop": 256, "batch": 16, "iters": 80000,
               "workers": 10 }
   },
   {
     "name": "star_w64_ship",
     "task": "star",
-    "args": { "width": 64, "crop": 256, "batch": 16, "iters": 400000,
+    "args": { "width": 64, "crop": 256, "batch": 16, "iters": 200000,
               "workers": 10, "bg-dir": "datagen/backgrounds" }
   },
   {
     "name": "sharp_w64_ship",
     "task": "sharp",
-    "args": { "width": 64, "crop": 256, "batch": 16, "iters": 400000,
+    "args": { "width": 64, "crop": 256, "batch": 16, "iters": 200000,
               "workers": 10 }
   }
 ]
