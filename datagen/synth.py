@@ -90,11 +90,36 @@ def make_psf(size, params, device):
     return psf / psf.sum()
 
 
+_PRESETS = None
+
+
+def _load_presets():
+    global _PRESETS
+    if _PRESETS is None:
+        import json
+        import os
+        p = os.path.join(os.path.dirname(__file__), "psf_presets.json")
+        try:
+            _PRESETS = json.load(open(p))
+        except Exception:
+            _PRESETS = []
+    return _PRESETS
+
+
 def sample_psf_family(gen, device):
-    """One optical system per training image (shared by all its stars)."""
+    """One optical system per training image (shared by all its stars).
+    50% of the time anchor on a REAL calibrated preset (Andreas's lenses:
+    undersampled FWHM ~1.5-1.9px, elongation 0.24-0.43) with jitter."""
+    presets = _load_presets()
     kind = torch.randint(0, 4, (1,), generator=gen).item()
-    fwhm = _loguniform(1.6, 9.0, 1, gen=gen).item()
-    elong = _rand(0.0, 0.35, 1, gen=gen).item()
+    if presets and torch.rand(1, generator=gen).item() < 0.5:
+        pr = presets[torch.randint(0, len(presets), (1,), generator=gen).item()]
+        fwhm = pr["fwhm_med"] * _rand(0.85, 1.35, 1, gen=gen).item()
+        elong = max(pr["elong_corner"], pr["elong_center"]) \
+            * _rand(0.7, 1.3, 1, gen=gen).item()
+    else:
+        fwhm = _loguniform(1.4, 9.0, 1, gen=gen).item()
+        elong = _rand(0.0, 0.45, 1, gen=gen).item()
     fam = dict(
         fwhm=fwhm,
         elong=elong,                       # field-varying elongation strength

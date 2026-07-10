@@ -1,0 +1,18 @@
+﻿E:\drive-download-20260704T082015Z-3-001\_1_Panorama_NR_stars.tiff
+E:\Editing_Course\Full_Siril+Adobe_Example\SKY\starmask_Step2.fit
+E:\Editing_Course\Full_Siril+Adobe_Example\SKY\starmask_Step2.tif
+E:\Editing_Course\Full_Siril_RGBHaDS_Example\starmask_DS_reg.fit
+E:\Editing_Course\Full_Siril_RGBHaDS_Example\starmask_DS_reg.tif
+E:\Editing_Course\Full_Siril_RGBHaDS_Example\starmask_Ha_reg.fit
+E:\Editing_Course\Full_Siril_RGBHaDS_Example\starmask_RGB2.tif
+E:\Editing_Course\Full_Siril_RGBHaDS_Example\Ha\starmask_RGB2.fit
+E:\Editing_Course\Los Antenes Vertorama\SKY\PI\_1_Panorama_stars.tif
+E:\EDITING_VIDEO\Stacked_stars.tif
+E:\July_2025\A7IV\Pic  Du Midi\Horizontal\PI\Pano1_Edit_stars.tif
+E:\July_2025\A7IV\Pic  Du Midi\Vertical\PI\DBE_STARS.tif
+E:\drive-download-20260704T082015Z-3-001\260615 Isaac newton sky 3\TIFF\Stacked\1.tif
+E:\drive-download-20260704T082015Z-3-001\260615 Isaac newton sky 3\TIFF\Stacked\2.tif
+E:\drive-download-20260704T082015Z-3-001\260615 Isaac newton sky 3\TIFF\Stacked\3.tif
+E:\drive-download-20260704T082015Z-3-001\260615 Isaac newton sky 3\TIFF\Stacked\4.tif
+E:\drive-download-20260704T082015Z-3-001\260615 Isaac newton sky 3\TIFF\Stacked\5.tif
+E:\drive-download-20260704T082015Z-3-001\260615 Isaac newton sky 3\TIFF\Stacked\6.tif

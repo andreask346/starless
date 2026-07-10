@@ -2,3 +2,7 @@ runs/
 .venv/
 __pycache__/
 *.onnx
+datagen/backgrounds/
+datagen/bg_prep.*
+STATUS.md
+STOP
