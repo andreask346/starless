@@ -1,14 +1,14 @@
 # Starless + EasySharp training status
 
-updated 2026-07-11 08:04
+updated 2026-07-11 08:34
 
 queue of 4 experiments
-## RUNNING: star_w32 (2026-07-11 08:04)
-{"step": 69200, "loss": 0.00548, "starless": 0.00321, "stars": 0.00321, "fft": 0.00664, "purity": 0.0, "img_s": 62.5, "lr": 0.0002200400861725891}
-{"step": 69400, "loss": 0.00392, "starless": 0.00243, "stars": 0.00243, "fft": 0.00279, "purity": 0.0, "img_s": 63.7, "lr": 0.00021962397878063692}
-{"step": 69600, "loss": 0.01459, "starless": 0.00861, "stars": 0.00861, "fft": 0.01676, "purity": 0.0, "img_s": 61.0, "lr": 0.00021920718916292108}
+## RUNNING: star_w32 (2026-07-11 08:34)
+{"step": 76400, "loss": 0.01221, "starless": 0.00745, "stars": 0.00745, "fft": 0.01032, "purity": 0.0, "img_s": 62.8, "lr": 0.00020466016732233866}
+{"step": 76600, "loss": 0.00442, "starless": 0.00259, "stars": 0.00259, "fft": 0.00537, "purity": 0.0, "img_s": 63.7, "lr": 0.00020422213670288986}
+{"step": 76800, "loss": 0.00393, "starless": 0.0022, "stars": 0.0022, "fft": 0.00638, "purity": 0.0, "img_s": 62.5, "lr": 0.00020378357586764016}
 
-latest sample: `runs/star_w32/samples/step0065000_s2.tif`
+latest sample: `runs/star_w32/samples/step0075000_s2.tif`
 
 ![progress](progress.jpg)
 
