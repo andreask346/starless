@@ -34,15 +34,27 @@ def fft_loss(a, b):
 
 def loss_fn(stars_pred, inp, tgt_starless, tgt_stars):
     starless_pred = inp - stars_pred
-    l_sl = charbonnier(starless_pred, tgt_starless)
-    l_st = charbonnier(stars_pred, tgt_stars)
+    # Stars are only ~2-5% of pixels. An unweighted L1 lets the model win by
+    # predicting ZERO stars (background dominates the mean) — and a purity
+    # penalty on the 95% background makes that collapse even more attractive.
+    # Fix: weight the star footprint heavily so actually removing stars is
+    # what minimizes the loss. l_sl already keeps the background clean (target
+    # stars are 0 there), so no separate purity term is needed.
+    # Weight by star BRIGHTNESS (not a noise-level threshold): bright, visible
+    # stars dominate, so removing them is what minimizes the loss.
+    w = 1.0 + 300.0 * tgt_stars.clamp(0, 0.3)
+
+    def wl1(a, b):
+        # tiny eps: star pixel values are ~1e-3..0.2, so a 1e-6 floor under the
+        # sqrt would swamp faint-star gradients and collapse the model to zero.
+        return (torch.sqrt((a - b) ** 2 + 1e-10) * w).sum() / w.sum()
+
+    l_sl = wl1(starless_pred, tgt_starless)      # clean background under stars
+    l_st = wl1(stars_pred, tgt_stars)            # correct star flux
     l_f = fft_loss(starless_pred, tgt_starless)
-    # purity: star layer should be ~zero away from true stars
-    bgmask = (tgt_stars < 1e-4).float()
-    l_pure = (stars_pred * bgmask).abs().mean()
-    total = l_sl + 0.5 * l_st + 0.1 * l_f + 0.5 * l_pure
+    total = l_sl + l_st + 0.05 * l_f
     return total, dict(starless=l_sl.item(), stars=l_st.item(),
-                       fft=l_f.item(), purity=l_pure.item())
+                       fft=l_f.item())
 
 
 @torch.no_grad()

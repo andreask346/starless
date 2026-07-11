@@ -120,6 +120,9 @@ class StarNAFNet(nn.Module):
             ch //= 2
             self.decoders.append(nn.Sequential(*[NAFBlock(ch) for _ in range(n)]))
         self.head = nn.Conv2d(width, in_ch, 3, padding=1)
+        # bias the gate toward "remove little" at init (sigmoid(-2)~=0.12) so
+        # early training doesn't wipe the whole image
+        nn.init.constant_(self.head.bias, -2.0)
 
     def forward(self, x):
         feats = []
@@ -132,9 +135,12 @@ class StarNAFNet(nn.Module):
         for up, dec, skip in zip(self.ups, self.decoders, reversed(feats)):
             y = up(y) + skip
             y = dec(y)
-        s = F.relu(self.head(y))            # non-negative star flux
-        s = torch.minimum(s, x.clamp_min(0.0))   # cannot remove more than exists
-        return s                            # stars layer; starless = x - s
+        # SIGMOID GATE (not relu): star layer = fraction of the input pixel.
+        # Sigmoid always has a gradient, so the head can't die on the 95%
+        # background the way relu(head) did (which caused the S=0 collapse).
+        # stars in [0, input] and starless = x - stars >= 0 by construction.
+        alpha = torch.sigmoid(self.head(y))
+        return x.clamp_min(0.0) * alpha     # stars; starless = x - stars
 
 
 def build(width=32, use_ffc=True):
