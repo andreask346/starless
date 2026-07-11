@@ -9,7 +9,7 @@ queue of 4 experiments
 ## sharp_w32: ok (3.8 h)
 - export: ok
 - eval: {"psnr": 54.9395, "flux": 0.0389, "reblur": 0.001, "ident": 0.0007, "panels": ["sharp_DS.tif", "sharp_Stacked.tif", "sharp_7IV01626.tif", "sharp_7IV01627.tif", "sharp_(1)_20260520113330.tif", "sharp_(10)_20260520113355.tif"], "step": 80000}
--- next: star_w64_ship
+## RUNNING: star_w64_ship (attempt 1, started 2026-07-11 19:42)
 
 latest sample: `runs/sharp_w32/samples/step0080000_s2.tif`
 
