@@ -12,7 +12,7 @@ queue of 4 experiments
 ## star_w64_ship: ok (17.5 h)
 - export: ok
 - eval: {"psnr_in": 57.73, "psnr_out": NaN, "leak": NaN, "recomp": 151.87, "completeness": {"faint": 0.9316, "mid": 0.9958, "bright": 0.9862}, "panels": ["panel_DS.tif", "panel_Stacked.tif", "panel_7IV01626.tif", "panel_7IV01627.tif", "panel_(1)_20260520113330.tif", "panel_(10)_20260520113355.tif"],
--- next: sharp_w64_ship
+## RUNNING: sharp_w64_ship (attempt 1, started 2026-07-12 13:11)
 
 latest sample: `runs/star_w64_ship/samples/step0200000_s2.tif`
 
