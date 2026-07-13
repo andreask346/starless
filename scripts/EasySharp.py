@@ -356,6 +356,7 @@ def run_headless(argv):
     from astropy.io import fits as afits
     base = os.path.splitext(os.path.basename(args.image))[0]
     d = args.outdir or os.path.dirname(args.image)
+    os.makedirs(d, exist_ok=True)
     afits.PrimaryHDU(out).writeto(os.path.join(d, f"sharp_{base}.fit"),
                                   overwrite=True)
     log(f"wrote sharp_{base}.fit -> {d}")

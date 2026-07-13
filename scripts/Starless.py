@@ -341,6 +341,7 @@ def run_headless(argv):
     print()
     starless = arr - stars
     out = args.outdir or os.path.dirname(args.image)
+    os.makedirs(out, exist_ok=True)
     base = os.path.splitext(os.path.basename(args.image))[0]
     from astropy.io import fits as afits
     afits.PrimaryHDU(starless).writeto(
