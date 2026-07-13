@@ -15,7 +15,8 @@ queue of 4 experiments
 ## sharp_w64_ship: ok (19.2 h)
 - export: ok
 - eval: {"psnr": 56.1207, "flux": 0.0364, "reblur": 0.001, "ident": 0.0006, "panels": ["sharp_DS.tif", "sharp_Stacked.tif", "sharp_7IV01626.tif", "sharp_7IV01627.tif", "sharp_(1)_20260520113330.tif", "sharp_(10)_20260520113355.tif"], "step": 165000}
--- queue complete
+
+queue exited 2026-07-13 08:22
 
 latest sample: `runs/sharp_w64_ship/samples/step0200000_s2.tif`
 
