@@ -1,6 +1,6 @@
 # Starless + EasySharp training status
 
-updated 2026-07-13 04:12
+updated 2026-07-13 04:42
 
 queue of 4 experiments
 ## star_w32: ok (5.6 h)
@@ -12,12 +12,12 @@ queue of 4 experiments
 ## star_w64_ship: ok (17.5 h)
 - export: ok
 - eval: {"psnr_in": 57.73, "psnr_out": NaN, "leak": NaN, "recomp": 151.87, "completeness": {"faint": 0.9316, "mid": 0.9958, "bright": 0.9862}, "panels": ["panel_DS.tif", "panel_Stacked.tif", "panel_7IV01626.tif", "panel_7IV01627.tif", "panel_(1)_20260520113330.tif", "panel_(10)_20260520113355.tif"],
-## RUNNING: sharp_w64_ship (2026-07-13 04:12)
-{"step": 156400, "loss": 0.00222, "main": 0.00152, "fft": 0.00099, "grad": 0.00139, "reblur": 0.00155, "img_s": 46.3, "lr": 3.471179250029263e-05}
-{"step": 156600, "loss": 0.00222, "main": 0.00153, "fft": 0.00113, "grad": 0.00166, "reblur": 0.00136, "img_s": 46.3, "lr": 3.4415266353285065e-05}
-{"step": 156800, "loss": 0.00207, "main": 0.00143, "fft": 0.001, "grad": 0.00161, "reblur": 0.00125, "img_s": 46.3, "lr": 3.411988591573329e-05}
+## RUNNING: sharp_w64_ship (2026-07-13 04:42)
+{"step": 161600, "loss": 0.00236, "main": 0.00159, "fft": 0.00131, "grad": 0.00167, "reblur": 0.00157, "img_s": 46.4, "lr": 2.7381876654551717e-05}
+{"step": 161800, "loss": 0.00251, "main": 0.00175, "fft": 0.00164, "grad": 0.00179, "reblur": 0.0014, "img_s": 46.3, "lr": 2.7116056525398155e-05}
+{"step": 162000, "loss": 0.00206, "main": 0.0014, "fft": 0.00097, "grad": 0.00156, "reblur": 0.00134, "img_s": 46.3, "lr": 2.685145414595461e-05}
 
-latest sample: `runs/sharp_w64_ship/samples/step0155000_s2.tif`
+latest sample: `runs/sharp_w64_ship/samples/step0160000_s2.tif`
 
 ![progress](progress.jpg)
 
