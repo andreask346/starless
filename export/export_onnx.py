@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 TILE = 512
 
 
-def main(ckpt_path, out_path, sharp=False):
+def main(ckpt_path, out_path, sharp=False, tile=TILE):
     ck = torch.load(ckpt_path, map_location="cpu", weights_only=True)
     cfg = ck.get("config", {})
     if sharp:
@@ -30,17 +30,17 @@ def main(ckpt_path, out_path, sharp=False):
 
     if sharp:
         from datagen.blur import COND_DIM
-        inputs = (torch.rand(1, 3, TILE, TILE), torch.rand(1, COND_DIM))
+        inputs = (torch.rand(1, 3, tile, tile), torch.rand(1, COND_DIM))
         in_names, out_names = ["input", "cond"], ["sharp"]
     else:
-        inputs = (torch.rand(1, 3, TILE, TILE),)
+        inputs = (torch.rand(1, 3, tile, tile),)
         in_names, out_names = ["input"], ["stars"]
     torch.onnx.export(model, inputs, out_path, opset_version=20,
                       input_names=in_names, output_names=out_names,
                       dynamo=True, external_data=False)
     print(f"exported {out_path} "
           f"({os.path.getsize(out_path) / 1e6:.1f} MB, opset 20, "
-          f"static {TILE}x{TILE}, {'deconv' if sharp else 'star'})")
+          f"static {tile}x{tile}, {'deconv' if sharp else 'star'})")
 
     import onnxruntime as ort
     sess = None
@@ -66,5 +66,9 @@ def main(ckpt_path, out_path, sharp=False):
 
 if __name__ == "__main__":
     sharp = "--sharp" in sys.argv
+    tile = TILE
+    for a in sys.argv[1:]:
+        if a.startswith("--tile="):
+            tile = int(a.split("=", 1)[1])
     pos = [a for a in sys.argv[1:] if not a.startswith("--")]
-    sys.exit(main(pos[0], pos[1], sharp=sharp))
+    sys.exit(main(pos[0], pos[1], sharp=sharp, tile=tile))

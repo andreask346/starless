@@ -1,0 +1,218 @@
+{
+ "harness_version": "1.0",
+ "label": "baseline_starnet",
+ "input": "E:\\Tenerife_&_La_Palma_June_2026\\Photos\\La_Palma\\Pared De Roberto Path Cygnus\\PI\\Neutralised.tif",
+ "starless": "E:\\Tenerife_&_La_Palma_June_2026\\Photos\\La_Palma\\Pared De Roberto Path Cygnus\\PI\\starless_Neutralised.fit",
+ "starmask": "E:\\Tenerife_&_La_Palma_June_2026\\Photos\\La_Palma\\Pared De Roberto Path Cygnus\\PI\\starmask_Neutralised.fit",
+ "cache": "C:\\Users\\User\\Documents\\For Claude\\starless\\eval\\sites_neutralised.npz",
+ "orientation": {
+  "method": "reconstruction",
+  "recon_err_direct": 0.11991632729768753,
+  "recon_err_flipped": 1.574921171254573e-08,
+  "flipped": true,
+  "recon_err": 1.574921171254573e-08
+ },
+ "noise_sigma": 0.0025249032769352198,
+ "detection_thr": 0.03213480859994888,
+ "n_sites_total": 172542,
+ "n_scored": 172542,
+ "subsample": {
+  "max_sites": 0,
+  "seed": 42,
+  "fraction": 1.0
+ },
+ "overall": {
+  "clean": 72211,
+  "artifact": 94798,
+  "missed": 5533,
+  "clean_pct": 41.85,
+  "artifact_pct": 54.94,
+  "missed_pct": 3.21
+ },
+ "census_peak": [
+  {
+   "bin": "0.03-0.1",
+   "n": 2059,
+   "clean": 0,
+   "artifact": 1093,
+   "missed": 966,
+   "clean_pct": 0.0,
+   "artifact_pct": 53.1,
+   "missed_pct": 46.9
+  },
+  {
+   "bin": "0.1-0.2",
+   "n": 7737,
+   "clean": 230,
+   "artifact": 6807,
+   "missed": 700,
+   "clean_pct": 3.0,
+   "artifact_pct": 88.0,
+   "missed_pct": 9.0
+  },
+  {
+   "bin": "0.2-0.35",
+   "n": 25519,
+   "clean": 8575,
+   "artifact": 16757,
+   "missed": 187,
+   "clean_pct": 33.6,
+   "artifact_pct": 65.7,
+   "missed_pct": 0.7
+  },
+  {
+   "bin": "0.35-0.5",
+   "n": 40769,
+   "clean": 17361,
+   "artifact": 22633,
+   "missed": 775,
+   "clean_pct": 42.6,
+   "artifact_pct": 55.5,
+   "missed_pct": 1.9
+  },
+  {
+   "bin": "0.5-0.65",
+   "n": 78486,
+   "clean": 33947,
+   "artifact": 42053,
+   "missed": 2486,
+   "clean_pct": 43.3,
+   "artifact_pct": 53.6,
+   "missed_pct": 3.2
+  },
+  {
+   "bin": ">0.65",
+   "n": 17972,
+   "clean": 12098,
+   "artifact": 5455,
+   "missed": 419,
+   "clean_pct": 67.3,
+   "artifact_pct": 30.4,
+   "missed_pct": 2.3
+  }
+ ],
+ "census_fwhm": [
+  {
+   "bin": "<1.5",
+   "n": 18954,
+   "clean": 14145,
+   "artifact": 4805,
+   "missed": 4,
+   "clean_pct": 74.6,
+   "artifact_pct": 25.4,
+   "missed_pct": 0.0
+  },
+  {
+   "bin": "1.5-2",
+   "n": 86593,
+   "clean": 44634,
+   "artifact": 41905,
+   "missed": 54,
+   "clean_pct": 51.5,
+   "artifact_pct": 48.4,
+   "missed_pct": 0.1
+  },
+  {
+   "bin": "2-3",
+   "n": 56049,
+   "clean": 13380,
+   "artifact": 41601,
+   "missed": 1068,
+   "clean_pct": 23.9,
+   "artifact_pct": 74.2,
+   "missed_pct": 1.9
+  },
+  {
+   "bin": "3-4",
+   "n": 8054,
+   "clean": 52,
+   "artifact": 5504,
+   "missed": 2498,
+   "clean_pct": 0.6,
+   "artifact_pct": 68.3,
+   "missed_pct": 31.0
+  },
+  {
+   "bin": "4-6",
+   "n": 2538,
+   "clean": 0,
+   "artifact": 975,
+   "missed": 1563,
+   "clean_pct": 0.0,
+   "artifact_pct": 38.4,
+   "missed_pct": 61.6
+  },
+  {
+   "bin": "6-10",
+   "n": 273,
+   "clean": 0,
+   "artifact": 7,
+   "missed": 266,
+   "clean_pct": 0.0,
+   "artifact_pct": 2.6,
+   "missed_pct": 97.4
+  },
+  {
+   "bin": ">10",
+   "n": 81,
+   "clean": 0,
+   "artifact": 1,
+   "missed": 80,
+   "clean_pct": 0.0,
+   "artifact_pct": 1.2,
+   "missed_pct": 98.8
+  }
+ ],
+ "artifact_types": {
+  "bright_residual+color": 17468,
+  "dark_hole+color": 27609,
+  "dark_hole": 26626,
+  "ring": 5595,
+  "bright_residual": 12207,
+  "ring+color": 5293
+ },
+ "artifact_amp_sigma": {
+  "median": 21.09,
+  "p75": 26.24,
+  "p95": 46.75
+ },
+ "dark_hole": {
+  "count": 54235,
+  "frac_of_artifacts": 0.5721,
+  "median_depth_sigma": 20.73
+ },
+ "missed": {
+  "count": 5533,
+  "median_peak": 0.5059,
+  "median_fwhm": 3.57,
+  "resfrac_pct": {
+   "25": 0.61143,
+   "50": 0.75626,
+   "75": 0.9246,
+   "95": 1.28656
+  }
+ },
+ "residual_stars": {
+  "count_in_scored": 43402,
+  "estimated_total": 43402,
+  "definition": "sites with starless residual peak (rmax) > input detection threshold"
+ },
+ "score": 0.0878,
+ "score_weights": {
+  "<0.03": 0.25,
+  "0.03-0.1": 0.5,
+  "0.1-0.2": 0.75,
+  "0.2-0.35": 1.0,
+  "0.35-0.5": 1.25,
+  "0.5-0.65": 1.5,
+  ">0.65": 2.0
+ },
+ "runtime_sec": 12.5,
+ "mask_smooth_leak": {
+  "smooth_leak_fraction": 0.28663718700408936,
+  "smooth_mean": 0.005353620741516352,
+  "smooth_p99": 0.026891762390732765,
+  "smooth_max": 0.06370311230421066,
+  "smooth_frac_gt_0p01": 0.18034917041971602
+ }
+}

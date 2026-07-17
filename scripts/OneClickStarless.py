@@ -4,10 +4,9 @@
 # and a star layer with EXACT recomposition — Subtract mode (linear images):
 # starless + stars == input; Descreen mode (stretched images):
 # 1-(1-starless)*(1-stars) == input (Screen blend). Auto-detects per image.
-# Stretched inputs are canonicalized before inference (invertible MTF), and
-# Deep clean adds coarse multi-scale + residual-sweep passes for big stars.
 # Inference: ONNX Runtime (DirectML GPU when available, CPU fallback),
-# 512px tiles with Hann-feathered blending.
+# 512px tiles, 50% overlap, Hann-feathered blending. Experimental extras
+# (off by default until the v2 model): canonicalized inference, deep clean.
 #
 # Requires Siril >= 1.4.4 (sirilpy >= 1.0.25). Model weights: starless_*.onnx
 # next to this script, or picked via the GUI.
@@ -18,13 +17,14 @@ import sys
 import time
 import traceback
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 MIN_SIRIL = "1.4.4"
 TILE = 512
-OVERLAP = 128
+OVERLAP = 256           # 50% tile overlap: more Hann-averaged predictions per
+                        # pixel; measured +1pp clean rate on the census frame
 EXTRACT_MODES = ("auto", "subtract", "descreen")
 STRETCH_BG = 0.05       # robust bg median above this => stretched image
-CANON_TARGET_BG = 0.05  # background the model is canonicalized to at inference
+CANON_TARGET_BG = 0.05  # background used when canonicalize is forced on
 
 try:
     import sirilpy as s
@@ -151,17 +151,18 @@ def resize_ch(img, h, w):
     return (top * (1 - wy) + bot * wy).astype(np.float32)
 
 
-def extract_star_layer(sess, data, extract_mode="auto", deep_clean=True,
-                       canonicalize="auto", target_bg=CANON_TARGET_BG,
+def extract_star_layer(sess, data, extract_mode="auto", deep_clean=False,
+                       canonicalize="off", target_bg=CANON_TARGET_BG,
                        log=print, progress=None):
     """Full pipeline on (3,H,W) float32 -> (starless, stars, info).
 
-    Stretched images are canonicalized (exact-invertible inverse MTF that
-    puts the background at target_bg) before inference and the starless is
-    mapped back, so the model always sees its training domain; stars are
-    then re-derived in the input domain (exact recomposition preserved).
-    deep_clean adds a coarse multi-scale pass (big saturated stars, halos
-    wider than one tile) and a second residual sweep."""
+    canonicalize/deep_clean are EXPERIMENTAL and off by default: census-
+    measured on the v1 weights, inverse-MTF canonicalization amplifies
+    background-adjacent model errors through the restretch gain (artifacts
+    21->32-51 sigma) and deep clean's coarse passes eat Milky Way texture
+    (mask leak 29->59%). Re-evaluate both after the v2 retrain; the
+    machinery is kept because the mechanisms are sound, the v1 weights
+    aren't. Exact recomposition is preserved in every combination."""
     bg = robust_bg_median(data)
     stretched = bg > STRETCH_BG
     mode = extract_mode if extract_mode != "auto" else (
@@ -369,15 +370,16 @@ def run_gui(siril):
                 "Descreen — stretched images (Screen recombine)"])
             h2.addWidget(self.mode_combo, 1)
             v.addLayout(h2)
-            self.cb_deep = QCheckBox("Deep clean (extra passes for big "
-                                     "stars and leftovers)")
+            self.cb_deep = QCheckBox("Deep clean — extra passes for big "
+                                     "stars (experimental until v2 model)")
+            self.cb_deep.setChecked(False)
+            v.addWidget(self.cb_deep)
             self.cb_starless = QCheckBox("Save starless FITS")
             self.cb_stars = QCheckBox("Save star layer FITS "
                                       "(exact recomposition)")
             self.cb_replace = QCheckBox("Replace loaded image with starless "
                                         "(undoable)")
-            for cb in (self.cb_deep, self.cb_starless, self.cb_stars,
-                       self.cb_replace):
+            for cb in (self.cb_starless, self.cb_stars, self.cb_replace):
                 cb.setChecked(True)
                 v.addWidget(cb)
             self.pbar = QProgressBar()
@@ -456,11 +458,11 @@ def run_headless(argv):
     ap.add_argument("--outdir", default="")
     ap.add_argument("--extract", choices=EXTRACT_MODES, default="auto")
     ap.add_argument("--deep-clean", dest="deep_clean", action="store_true",
-                    default=True)
+                    default=False)
     ap.add_argument("--no-deep-clean", dest="deep_clean",
                     action="store_false")
     ap.add_argument("--canonicalize", choices=("auto", "on", "off"),
-                    default="auto")
+                    default="off")
     ap.add_argument("--target-bg", type=float, default=CANON_TARGET_BG)
     ap.add_argument("--suffix", default="",
                     help="extra tag appended to output filenames")
