@@ -17,6 +17,23 @@ neutralized Cygnus nightscape; median 0.381, noise sigma 0.0025). Scored with
 | canon05 — inverse-MTF to bg 0.05 | -0.5577 | 2.14 | 85.53 | 12.32 | 41.4 | 26.2 | REFUTED |
 | canon02 — inverse-MTF to bg 0.02 | -0.6794 | 0.44 | 67.62 | 31.94 | 51.3 | 21.3 | REFUTED |
 
+## Competitor benchmark — StarXTerminator AI11 (CLI 1.0.2, defaults, RTX 4090, 13 s)
+
+Scored 2026-07-17 on the identical census. THE BAR FOR v2:
+
+| tool | score | clean % | artifact % | missed % | artifact med (sigma) | mask leak % |
+|---|---|---|---|---|---|---|
+| SXT AI11 | +0.8944 | 97.82 | 1.89 | 0.29 | 7.8 | **42.4** |
+| OneClick v1 (ov256) | +0.0991 | 42.83 | 53.96 | 3.21 | 21.0 | **28.4** |
+
+Where SXT is beatable on this frame: monsters (FWHM>10px: 95.1% missed for
+SXT too; 6-10px: 50.5% missed), faint bin (peak 0.03-0.1: only 44.4% clean),
+diffuse-glow theft (42.4% of its star mask is low-frequency background vs
+our 28.4% — consistent with the earlier finding that our starless preserves
+nebula texture better), and recomposition (SXT starless+stars deviates up
+to 6.5e-4 from the input; ours is exact to float precision by construction).
+Everywhere else SXT is far ahead — that is the v2 target.
+
 ## Conclusions
 
 1. **Canonicalization (inverse-MTF to a "linear-like" domain) is empirically
