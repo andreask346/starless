@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
-# Starless — AI star removal for Siril.
+# One Click Starless — AI star removal for Siril.
 # Removes stars from the loaded image (or a file), returning a starless image
-# and a star layer with EXACT recomposition: starless + stars == input.
+# and a star layer with EXACT recomposition — Subtract mode (linear images):
+# starless + stars == input; Descreen mode (stretched images):
+# 1-(1-starless)*(1-stars) == input (Screen blend). Auto-detects per image.
+# Stretched inputs are canonicalized before inference (invertible MTF), and
+# Deep clean adds coarse multi-scale + residual-sweep passes for big stars.
 # Inference: ONNX Runtime (DirectML GPU when available, CPU fallback),
 # 512px tiles with Hann-feathered blending.
 #
@@ -14,10 +18,13 @@ import sys
 import time
 import traceback
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 MIN_SIRIL = "1.4.4"
 TILE = 512
 OVERLAP = 128
+EXTRACT_MODES = ("auto", "subtract", "descreen")
+STRETCH_BG = 0.05       # robust bg median above this => stretched image
+CANON_TARGET_BG = 0.05  # background the model is canonicalized to at inference
 
 try:
     import sirilpy as s
@@ -98,6 +105,123 @@ def remove_stars(sess, img, progress=None):
     return np.clip(np.minimum(stars, np.clip(img, 0, None)), 0, None)
 
 
+# ------------------------------------------------- domain + star-layer math
+def robust_bg_median(img):
+    """Robust background estimate: median over a subsampled frame."""
+    sub = img[:, ::4, ::4] if img.shape[1] > 2000 else img
+    return float(np.median(sub))
+
+
+def mtf(x, m):
+    """Midtones transfer function (monotonic, fixes 0 and 1).
+    The inverse of mtf(., m) is mtf(., 1 - m)."""
+    x = np.clip(x, 0.0, 1.0).astype(np.float32)
+    return ((m - 1.0) * x) / (((2.0 * m - 1.0) * x) - m)
+
+
+def solve_mtf_m(from_bg, to_bg):
+    """m such that mtf(from_bg, m) == to_bg."""
+    b, t = float(from_bg), float(to_bg)
+    return b * (t - 1.0) / (2.0 * t * b - t - b)
+
+
+def descreen_stars(inp, starless, eps=1e-6):
+    """Screen-consistent star layer ('stars over black'): recombine with
+    1-(1-starless)*(1-stars). The right layer for stretched images — the
+    star layer no longer carries the sky background, so it can be scaled,
+    blurred or recombined without dark rings or clipping."""
+    x = np.clip(inp, 0.0, 1.0)
+    sl = np.clip(starless, 0.0, 1.0)
+    return np.clip((x - sl) / np.maximum(1.0 - sl, eps), 0.0, 1.0)
+
+
+def resize_ch(img, h, w):
+    """Bilinear resize of (3,H,W), numpy only."""
+    _, ih, iw = img.shape
+    ys = np.linspace(0, ih - 1, h, dtype=np.float32)
+    xs = np.linspace(0, iw - 1, w, dtype=np.float32)
+    y0 = np.floor(ys).astype(np.int32)
+    y1 = np.minimum(y0 + 1, ih - 1)
+    x0 = np.floor(xs).astype(np.int32)
+    x1 = np.minimum(x0 + 1, iw - 1)
+    wy = (ys - y0)[None, :, None]
+    wx = (xs - x0)[None, None, :]
+    top = img[:, y0][:, :, x0] * (1 - wx) + img[:, y0][:, :, x1] * wx
+    bot = img[:, y1][:, :, x0] * (1 - wx) + img[:, y1][:, :, x1] * wx
+    return (top * (1 - wy) + bot * wy).astype(np.float32)
+
+
+def extract_star_layer(sess, data, extract_mode="auto", deep_clean=True,
+                       canonicalize="auto", target_bg=CANON_TARGET_BG,
+                       log=print, progress=None):
+    """Full pipeline on (3,H,W) float32 -> (starless, stars, info).
+
+    Stretched images are canonicalized (exact-invertible inverse MTF that
+    puts the background at target_bg) before inference and the starless is
+    mapped back, so the model always sees its training domain; stars are
+    then re-derived in the input domain (exact recomposition preserved).
+    deep_clean adds a coarse multi-scale pass (big saturated stars, halos
+    wider than one tile) and a second residual sweep."""
+    bg = robust_bg_median(data)
+    stretched = bg > STRETCH_BG
+    mode = extract_mode if extract_mode != "auto" else (
+        "descreen" if stretched else "subtract")
+    canon = stretched if canonicalize == "auto" else (canonicalize == "on")
+    log(f"background median {bg:.3f} -> "
+        f"{'stretched' if stretched else 'linear'} image; "
+        f"star layer: {mode}" + (", canonicalized inference" if canon else ""))
+    info = {"bg": bg, "stretched": stretched, "mode": mode,
+            "canonicalized": canon}
+
+    if canon:
+        m_c = solve_mtf_m(bg, target_bg)
+        work = mtf(data, m_c)
+        log(f"inverse MTF m={m_c:.3f} (background {bg:.3f} -> {target_bg:.3f})")
+    else:
+        m_c = None
+        work = data
+
+    def sub_prog(a, b):
+        if progress is None:
+            return None
+        return lambda f: progress(a + (b - a) * f)
+
+    main_end = 0.55 if deep_clean else 1.0
+    stars_w = remove_stars(sess, work, progress=sub_prog(0.0, main_end))
+
+    if deep_clean:
+        _, h, w = work.shape
+        # coarse passes catch big saturated stars + halos beyond one tile
+        for fct, a, b in ((4, 0.55, 0.60), (2, 0.60, 0.70)):
+            down = resize_ch(work, max(h // fct, 1), max(w // fct, 1))
+            sd = remove_stars(sess, down, progress=sub_prog(a, b))
+            stars_w = np.maximum(stars_w, resize_ch(sd, h, w))
+        stars_w = np.minimum(stars_w, np.clip(work, 0, None))
+        # second pass sweeps residuals the first pass left behind
+        resid = remove_stars(sess, work - stars_w,
+                             progress=sub_prog(0.70, 1.0))
+        stars_w = np.minimum(stars_w + resid, np.clip(work, 0, None))
+
+    starless_w = work - stars_w
+    if canon:
+        starless = mtf(starless_w, 1.0 - m_c)  # back to the input domain
+        starless = np.minimum(starless, np.clip(data, 0.0, 1.0))
+    else:
+        starless = starless_w
+    stars_sub = data - starless               # exact in the input domain
+
+    if mode == "descreen":
+        stars = descreen_stars(data, starless)
+        rec = 1.0 - (1.0 - np.clip(starless, 0, 1)) * (1.0 - stars)
+        info["recomp_err"] = float(np.abs(rec - np.clip(data, 0, 1)).max())
+        info["recombine"] = "screen: 1-(1-starless)*(1-stars)"
+    else:
+        stars = stars_sub
+        info["recomp_err"] = float(np.abs((starless + stars) - data).max())
+        info["recombine"] = "add: starless + stars"
+    return starless.astype(np.float32), stars.astype(np.float32), info
+
+
 def default_model():
     d = os.path.dirname(os.path.abspath(__file__))
     cands = sorted(
@@ -131,19 +255,20 @@ def get_loaded_image(siril):
 
 
 def run_on_loaded(siril, model_path, save_starless, save_stars,
-                  replace_loaded, log, prog):
+                  replace_loaded, extract_mode, deep_clean, log, prog):
     t0 = time.time()
     sess = make_session(model_path, log)
     data, mono = get_loaded_image(siril)
     log(f"removing stars from loaded image "
         f"({data.shape[2]}x{data.shape[1]})...")
-    stars = remove_stars(sess, data,
-                         progress=lambda f: prog(0.1 + 0.8 * f,
-                                                 "removing stars"))
-    starless = data - stars
-    # exact-recomposition + honesty check
-    recomp = float(np.abs((starless + stars) - data).max())
-    log(f"recomposition max err {recomp:.2e} (exact by construction)")
+    starless, stars, info = extract_star_layer(
+        sess, data, extract_mode=extract_mode, deep_clean=deep_clean,
+        log=log, progress=lambda f: prog(0.1 + 0.85 * f, "removing stars"))
+    log(f"recomposition ({info['recombine']}) max err "
+        f"{info['recomp_err']:.2e}")
+    log("recombine recipe (PixelMath): "
+        + ("1-(1-starless)*(1-starmask)" if info["mode"] == "descreen"
+           else "starless + starmask"))
 
     base = os.path.splitext(siril.get_image_filename() or "image")[0]
     outputs = []
@@ -165,7 +290,7 @@ def run_on_loaded(siril, model_path, save_starless, save_stars,
         log(f"saved {p}")
     if replace_loaded:
         with siril.image_lock():
-            siril.undo_save_state("Starless star removal")
+            siril.undo_save_state("One Click Starless removal")
             siril.set_image_pixeldata(
                 (starless[0] if mono else starless).astype(np.float32))
         log("loaded image replaced with starless result (undo available)")
@@ -184,15 +309,16 @@ def run_gui(siril):
     from PyQt6.QtCore import QThread, pyqtSignal
     from PyQt6.QtWidgets import (
         QApplication, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-        QLineEdit, QCheckBox, QProgressBar, QFileDialog, QMessageBox)
+        QLineEdit, QCheckBox, QComboBox, QProgressBar, QFileDialog,
+        QMessageBox)
 
     def log(msg):
         if siril is not None:
             try:
-                siril.log(f"Starless: {msg}"[:1000])
+                siril.log(f"OneClickStarless: {msg}"[:1000])
             except Exception:
                 pass
-        print(f"Starless: {msg}")
+        print(f"OneClickStarless: {msg}")
 
     class Worker(QThread):
         progressed = pyqtSignal(float, str)
@@ -222,7 +348,7 @@ def run_gui(siril):
     class Dlg(QDialog):
         def __init__(self):
             super().__init__()
-            self.setWindowTitle(f"Starless {VERSION} - AI star removal")
+            self.setWindowTitle(f"One Click Starless {VERSION}")
             self.setMinimumWidth(560)
             v = QVBoxLayout(self)
             v.addWidget(QLabel("<b>Model</b> (.onnx)"))
@@ -234,12 +360,24 @@ def run_gui(siril):
             h.addWidget(b)
             v.addLayout(h)
             v.addWidget(QLabel("Runs on the image currently loaded in Siril."))
+            h2 = QHBoxLayout()
+            h2.addWidget(QLabel("Star layer:"))
+            self.mode_combo = QComboBox()
+            self.mode_combo.addItems([
+                "Auto (detected per image)",
+                "Subtract — linear images (starless + stars)",
+                "Descreen — stretched images (Screen recombine)"])
+            h2.addWidget(self.mode_combo, 1)
+            v.addLayout(h2)
+            self.cb_deep = QCheckBox("Deep clean (extra passes for big "
+                                     "stars and leftovers)")
             self.cb_starless = QCheckBox("Save starless FITS")
             self.cb_stars = QCheckBox("Save star layer FITS "
-                                      "(starless + stars = original, exact)")
+                                      "(exact recomposition)")
             self.cb_replace = QCheckBox("Replace loaded image with starless "
                                         "(undoable)")
-            for cb in (self.cb_starless, self.cb_stars, self.cb_replace):
+            for cb in (self.cb_deep, self.cb_starless, self.cb_stars,
+                       self.cb_replace):
                 cb.setChecked(True)
                 v.addWidget(cb)
             self.pbar = QProgressBar()
@@ -272,17 +410,20 @@ def run_gui(siril):
         def go(self):
             mp = self.model_edit.text().strip()
             if not os.path.isfile(mp):
-                QMessageBox.warning(self, "Starless",
+                QMessageBox.warning(self, "One Click Starless",
                                     "Pick a .onnx model file.")
                 return
             if siril is None or not siril.is_image_loaded():
-                QMessageBox.warning(self, "Starless",
+                QMessageBox.warning(self, "One Click Starless",
                                     "Load an image in Siril first.")
                 return
             self.run_btn.setEnabled(False)
-            self.worker = Worker(mp, (self.cb_starless.isChecked(),
-                                      self.cb_stars.isChecked(),
-                                      self.cb_replace.isChecked()))
+            self.worker = Worker(
+                mp, (self.cb_starless.isChecked(),
+                     self.cb_stars.isChecked(),
+                     self.cb_replace.isChecked(),
+                     EXTRACT_MODES[self.mode_combo.currentIndex()],
+                     self.cb_deep.isChecked()))
             self.worker.progressed.connect(
                 lambda f, m: (self.pbar.setValue(int(f * 1000)),
                               self.status.setText(m)))
@@ -298,7 +439,7 @@ def run_gui(siril):
 
     app = QApplication.instance() or QApplication(sys.argv)
     dlg = Dlg()
-    shot = os.environ.get("STARLESS_SCREENSHOT")
+    shot = os.environ.get("ONECLICK_STARLESS_SCREENSHOT")
     if shot:
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(900, lambda: (dlg.grab().save(shot), app.quit()))
@@ -309,17 +450,29 @@ def run_gui(siril):
 # ------------------------------------------------------------- entry
 def run_headless(argv):
     import argparse
-    ap = argparse.ArgumentParser(prog="Starless")
+    ap = argparse.ArgumentParser(prog="OneClickStarless")
     ap.add_argument("--model", default=default_model())
     ap.add_argument("--image", required=True, help="FITS/TIFF to process")
     ap.add_argument("--outdir", default="")
+    ap.add_argument("--extract", choices=EXTRACT_MODES, default="auto")
+    ap.add_argument("--deep-clean", dest="deep_clean", action="store_true",
+                    default=True)
+    ap.add_argument("--no-deep-clean", dest="deep_clean",
+                    action="store_false")
+    ap.add_argument("--canonicalize", choices=("auto", "on", "off"),
+                    default="auto")
+    ap.add_argument("--target-bg", type=float, default=CANON_TARGET_BG)
+    ap.add_argument("--suffix", default="",
+                    help="extra tag appended to output filenames")
     args = ap.parse_args(argv)
 
     def log(m):
-        print(f"Starless: {m}", flush=True)
+        print(f"OneClickStarless: {m}", flush=True)
 
     sess = make_session(args.model, log)
     ext = os.path.splitext(args.image)[1].lower()
+    from astropy.io import fits as afits
+    roworder = "TOP-DOWN"  # numpy row 0 = image top, matching TIFF reads
     if ext in (".tif", ".tiff"):
         import tifffile
         arr = tifffile.imread(args.image).astype(np.float32)
@@ -330,39 +483,44 @@ def run_headless(argv):
         if arr.max() > 1.5:
             arr /= 65535.0
     else:
-        from astropy.io import fits as afits
         with afits.open(args.image) as h:
-            d = next(x for x in h if x.data is not None).data.astype(np.float32)
+            hdu = next(x for x in h if x.data is not None)
+            d = hdu.data.astype(np.float32)
+            roworder = hdu.header.get("ROWORDER", "BOTTOM-UP")
         arr = d if d.ndim == 3 else d[None].repeat(3, axis=0)
         if arr.max() > 1.5:
             arr /= 65535.0
-    stars = remove_stars(sess, arr,
-                         progress=lambda f: print(f"\r{f*100:.0f}%", end=""))
+    starless, stars, info = extract_star_layer(
+        sess, arr, extract_mode=args.extract, deep_clean=args.deep_clean,
+        canonicalize=args.canonicalize, target_bg=args.target_bg, log=log,
+        progress=lambda f: print(f"\r{f*100:.0f}%", end=""))
     print()
-    starless = arr - stars
+    log(f"recomposition ({info['recombine']}) max err "
+        f"{info['recomp_err']:.2e}")
     out = args.outdir or os.path.dirname(args.image)
     os.makedirs(out, exist_ok=True)
-    base = os.path.splitext(os.path.basename(args.image))[0]
-    from astropy.io import fits as afits
-    afits.PrimaryHDU(starless).writeto(
-        os.path.join(out, f"starless_{base}.fit"), overwrite=True)
-    afits.PrimaryHDU(stars).writeto(
-        os.path.join(out, f"starmask_{base}.fit"), overwrite=True)
+    base = os.path.splitext(os.path.basename(args.image))[0] + args.suffix
+    for name, a in (("starless", starless), ("starmask", stars)):
+        hdu = afits.PrimaryHDU(a)
+        hdu.header["ROWORDER"] = (roworder, "stored row order")
+        hdu.header["EXTRMODE"] = (info["mode"].upper(),
+                                  "star layer mode")
+        hdu.writeto(os.path.join(out, f"{name}_{base}.fit"), overwrite=True)
     log(f"wrote starless_{base}.fit + starmask_{base}.fit -> {out}")
     return 0
 
 
 def main():
     argv = sys.argv[1:]
-    if not argv and os.environ.get("STARLESS_ARGS"):
+    if not argv and os.environ.get("ONECLICK_STARLESS_ARGS"):
         import shlex
         argv = [a.strip('"') for a in
-                shlex.split(os.environ["STARLESS_ARGS"], posix=False)]
+                shlex.split(os.environ["ONECLICK_STARLESS_ARGS"], posix=False)]
     if argv:
         sys.exit(run_headless(argv))
     siril = make_siril()
-    if siril is None and not os.environ.get("STARLESS_MOCK"):
-        print("Starless: no Siril connection - run from Siril's Scripts menu "
+    if siril is None and not os.environ.get("ONECLICK_STARLESS_MOCK"):
+        print("OneClickStarless: no Siril connection - run from Siril's Scripts menu "
               "or pass --image for headless use.")
         sys.exit(1)
     if siril is not None:
