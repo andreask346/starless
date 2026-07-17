@@ -16,28 +16,36 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from datagen.synth import make_pair            # noqa: E402
+from datagen.synth import make_pair, default_config  # noqa: E402
 from models.nafnet_star import build           # noqa: E402
 from eval.infer_tiles import infer_image       # noqa: E402
 
 TORTURE = os.path.join(os.path.dirname(__file__), "torture_list.txt")
 
 
-def synthetic_suite(model, device, n=40, crop=256):
+def synthetic_suite(model, device, n=40, crop=256, data_cfg=None):
+    # data_cfg must match the recipe the model TRAINED on, else the metrics
+    # are incomparable across runs (v1 history was scored on the v1 recipe)
+    if data_cfg is None:
+        data_cfg = default_config(1)
     tot = dict(psnr_in=0.0, psnr_out=0.0, leak=0.0, recomp=0.0)
+    n_out = 0
     bins = {k: [0, 0] for k in ("faint", "mid", "bright")}   # found, total
     for i in range(n):
         inp, sl, st = make_pair(crop, crop, None, seed=31_000_000 + i,
-                                device=device)
+                                device=device, cfg=data_cfg)
         with torch.no_grad():
             pred = model(inp[None])[0]
         starless = inp - pred
         foot = st > 1e-4
         mse_in = float(((starless - sl)[foot] ** 2).mean()) if foot.any() else 0
-        mse_out = float(((starless - sl)[~foot] ** 2).mean())
         tot["psnr_in"] += -10 * math.log10(max(mse_in, 1e-12)) / n
-        tot["psnr_out"] += -10 * math.log10(max(mse_out, 1e-12)) / n
-        tot["leak"] += float(pred[~foot].abs().mean()) / n
+        inv = ~foot
+        if inv.any():   # dense fields can put star flux under every pixel
+            mse_out = float(((starless - sl)[inv] ** 2).mean())
+            tot["psnr_out"] += -10 * math.log10(max(mse_out, 1e-12))
+            tot["leak"] += float(pred[inv].abs().mean())
+            n_out += 1
         recomp = float(((starless + pred) - inp).abs().max())
         tot["recomp"] += -20 * math.log10(max(recomp, 1e-9)) / n
         # per-star completeness: fraction of true star flux removed, by bin
@@ -49,6 +57,8 @@ def synthetic_suite(model, device, n=40, crop=256):
                 frac = float(pred[m].sum() / st[m].sum())
                 bins[name][0] += min(frac, 1.0)
                 bins[name][1] += 1
+    for k in ("psnr_out", "leak"):
+        tot[k] /= max(n_out, 1)
     comp = {k: round(v[0] / max(v[1], 1), 4) for k, v in bins.items()}
     return {**{k: round(v, 2) for k, v in tot.items()},
             "completeness": comp}
@@ -95,7 +105,10 @@ def main(ckpt_path):
                   use_ffc=not cfg.get("no_ffc", False)).to(device)
     model.load_state_dict(ck["model"])
     model.eval()
-    metrics = synthetic_suite(model, device)
+    recipe = str(cfg.get("data_recipe", "v1"))
+    metrics = synthetic_suite(
+        model, device, data_cfg=default_config(1 if recipe == "v1" else 2))
+    metrics["data_recipe"] = recipe
     run_dir = os.path.dirname(ckpt_path)
     panels = real_panels(model, device, os.path.join(run_dir, "panel"))
     metrics["panels"] = [os.path.basename(p) for p in panels]

@@ -1,0 +1,23 @@
+[
+  {
+    "name": "star_v2_e1",
+    "task": "star",
+    "args": { "width": 64, "crop": 256, "batch": 16, "iters": 60000,
+              "workers": 10, "bg-dir": "datagen/backgrounds",
+              "init-from": "runs/star_w64_ship/best.pt" }
+  },
+  {
+    "name": "star_v2_e4_512",
+    "task": "star",
+    "args": { "width": 64, "crop": 512, "batch": 4, "iters": 20000,
+              "workers": 10, "bg-dir": "datagen/backgrounds",
+              "init-from": "runs/star_v2_e1/best.pt" }
+  },
+  {
+    "name": "star_v2_w32",
+    "task": "star",
+    "args": { "width": 32, "crop": 256, "batch": 16, "iters": 60000,
+              "workers": 10, "bg-dir": "datagen/backgrounds",
+              "init-from": "runs/star_w32/best.pt" }
+  }
+]
