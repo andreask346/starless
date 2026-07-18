@@ -1,11 +1,9 @@
 # Starless + EasySharp training status
 
-updated 2026-07-18 08:58
+updated 2026-07-18 23:20
 
 queue of 3 experiments
-## star_v2_e1: stopped (0.0 h)
-
-queue exited 2026-07-18 08:58
+## RUNNING: star_v2_e1 (attempt 1, started 2026-07-18 23:20)
 
 latest sample: `runs/sharp_w64_ship/samples/step0200000_s2.tif`
 
