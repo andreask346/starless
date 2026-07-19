@@ -1,13 +1,13 @@
 # Starless + EasySharp training status
 
-updated 2026-07-19 10:27
+updated 2026-07-19 10:28
 
 queue of 3 experiments
 ## star_v2_e1: done earlier (skipped)
-## RUNNING: star_v2_e4_512 (2026-07-19 10:27)
-{"step": 19800, "loss": 0.07971, "starless": 0.01308, "stars": 0.01308, "fft": 0.01976, "wing": 0.04681, "site": 0.1203, "chroma": 0.06531, "leak": 4e-05, "img_s": 12.1, "lr": 1.0737692253231292e-06}
-{"step": 20000, "loss": 0.04201, "starless": 0.01003, "stars": 0.01003, "fft": 0.002, "wing": 0.01244, "site": 0.19529, "chroma": 0.10749, "leak": 6e-05, "img_s": 12.1, "lr": 1e-06}
-{"eval_step": 20000, "psnr_stars": 41.48, "psnr_bg": 57.85}
+## star_v2_e4_512: ok (0.5 h)
+- export: ok
+- eval: {"psnr_in": 41.76, "psnr_out": 69.37, "leak": 0.0, "recomp": 150.36, "completeness": {"faint": 0.8525, "mid": 0.9634, "bright": 0.9898}, "data_recipe": "v2", "panels": ["panel_DS.tif", "panel_Stacked.tif", "panel_7IV01626.tif", "panel_7IV01627.tif", "panel_(1)_20260520113330.tif", "panel_(10
+-- next: star_v2_w32
 
 latest sample: `runs/star_v2_e4_512/samples/step0020000_s2.tif`
 
