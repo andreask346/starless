@@ -41,8 +41,17 @@ Scored on the identical census frame. Progress toward the SXT bar:
 | model | score | clean % | artifact % | missed % | artifact med (sigma) | mask leak % |
 |---|---|---|---|---|---|---|
 | SXT AI11 (target) | +0.894 | 97.82 | 1.89 | 0.29 | 7.8 | 42.4 |
-| **v2 E1** (60k @256, 2026-07-19) | **+0.491** | 74.44 | 24.86 | 0.71 | 16.6 | 34.9 |
+| **v2 E4** (E1 + 20k @512 FFC-adapt) | **+0.508** | 76.01 | 23.36 | 0.63 | 16.1 | 33.1 |
+| **v2 E1** (60k @256, 2026-07-19) | +0.491 | 74.44 | 24.86 | 0.71 | 16.6 | 34.9 |
 | v1 best (ov256) | +0.099 | 42.83 | 53.96 | 3.21 | 21.0 | 28.4 |
+
+E1->E4 gained only +0.017 (clean 74.4->76.0%): the crop-512 FFC adaptation
+helps marginally but the DATA RECIPE has plateaued ~76% clean / +0.51. The
+remaining ~22-point clean gap to SXT (97.8%) will not close by more of the
+same synthetic recipe - it needs the deferred v3 data levers (real PSF
+stamps from his GM lenses, measured A7RV/A7IV noise spectra, real-silhouette
+harvesting) so the synthetic stars/noise match his sensor. That was always
+the "next iteration after seeing v2 numbers" decision - and this is it.
 
 E1 alone closed ~half the v1->SXT gap. Big wins vs v1: clean 42.8->74.4%,
 artifact 54->25%, missed 3.2->0.71%, artifact severity 21->16.6 sigma. Still
