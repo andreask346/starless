@@ -34,6 +34,25 @@ nebula texture better), and recomposition (SXT starless+stars deviates up
 to 6.5e-4 from the input; ours is exact to float precision by construction).
 Everywhere else SXT is far ahead — that is the v2 target.
 
+## v2 retrain results (fine-tuned from ship ckpt on clean 3264-plate library)
+
+Scored on the identical census frame. Progress toward the SXT bar:
+
+| model | score | clean % | artifact % | missed % | artifact med (sigma) | mask leak % |
+|---|---|---|---|---|---|---|
+| SXT AI11 (target) | +0.894 | 97.82 | 1.89 | 0.29 | 7.8 | 42.4 |
+| **v2 E1** (60k @256, 2026-07-19) | **+0.491** | 74.44 | 24.86 | 0.71 | 16.6 | 34.9 |
+| v1 best (ov256) | +0.099 | 42.83 | 53.96 | 3.21 | 21.0 | 28.4 |
+
+E1 alone closed ~half the v1->SXT gap. Big wins vs v1: clean 42.8->74.4%,
+artifact 54->25%, missed 3.2->0.71%, artifact severity 21->16.6 sigma. Still
+behind SXT on clean/artifact rate. Remaining weak bins after E1: faint peaks
+(0.03-0.1: 0% clean), FWHM 3-6px (46/21% clean), and FWHM 6-10px (76% missed
+vs SXT 50%) - though FWHM>10px v2 already edges SXT (90% vs 95% missed). Mask
+leak rose slightly (28->35%) but stays below SXT's 42%. E4 (crop-512 FFC
+adaptation) + w32 rungs pending; expected to help the mid-FWHM + artifact
+bins. Data recipe still has headroom (real PSFs, measured noise) for a v3.
+
 ## Conclusions
 
 1. **Canonicalization (inverse-MTF to a "linear-like" domain) is empirically
