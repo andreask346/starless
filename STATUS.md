@@ -1,14 +1,14 @@
 # Starless + EasySharp training status
 
-updated 2026-07-19 03:51
+updated 2026-07-19 04:21
 
 queue of 3 experiments
-## RUNNING: star_v2_e1 (2026-07-19 03:51)
-{"step": 28800, "loss": 0.08937, "starless": 0.02025, "stars": 0.02025, "fft": 0.01159, "wing": 0.03168, "site": 0.28113, "chroma": 0.21215, "leak": 0.00019, "img_s": 29.9, "lr": 0.00015988718266963652}
-{"step": 29000, "loss": 0.11292, "starless": 0.0271, "stars": 0.0271, "fft": 0.00437, "wing": 0.02778, "site": 0.65753, "chroma": 0.34632, "leak": 0.00013, "img_s": 29.9, "lr": 0.00015832422545832383}
-{"step": 29200, "loss": 0.24843, "starless": 0.05194, "stars": 0.05194, "fft": 0.03047, "wing": 0.11988, "site": 0.51625, "chroma": 0.24914, "leak": 0.00018, "img_s": 29.9, "lr": 0.00015676041023251884}
+## RUNNING: star_v2_e1 (2026-07-19 04:21)
+{"step": 32200, "loss": 0.10981, "starless": 0.01143, "stars": 0.01143, "fft": 0.00868, "wing": 0.05051, "site": 0.58874, "chroma": 0.47499, "leak": 0.00024, "img_s": 29.9, "lr": 0.00013331689600131933}
+{"step": 32400, "loss": 0.08661, "starless": 0.01581, "stars": 0.01581, "fft": 0.01321, "wing": 0.03135, "site": 0.41856, "chroma": 0.2857, "leak": 0.00017, "img_s": 30.0, "lr": 0.00013176268158213928}
+{"step": 32600, "loss": 0.11707, "starless": 0.02628, "stars": 0.02628, "fft": 0.01202, "wing": 0.04288, "site": 0.48479, "chroma": 0.21432, "leak": 0.00031, "img_s": 30.0, "lr": 0.00013021052192107435}
 
-latest sample: `runs/star_v2_e1/samples/step0025000_s2.tif`
+latest sample: `runs/star_v2_e1/samples/step0030000_s2.tif`
 
 ![progress](progress.jpg)
 
