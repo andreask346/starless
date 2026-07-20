@@ -43,7 +43,14 @@ Scored on the identical census frame. Progress toward the SXT bar:
 | SXT AI11 (target) | +0.894 | 97.82 | 1.89 | 0.29 | 7.8 | 42.4 |
 | **v2 E4** (E1 + 20k @512 FFC-adapt) | **+0.508** | 76.01 | 23.36 | 0.63 | 16.1 | 33.1 |
 | **v2 E1** (60k @256, 2026-07-19) | +0.491 | 74.44 | 24.86 | 0.71 | 16.6 | 34.9 |
-| v1 best (ov256) | +0.099 | 42.83 | 53.96 | 3.21 | 21.0 | 28.4 |
+| **v2 w32** (light model, 60k) | +0.202 | 48.63 | 50.38 | 0.99 | 19.0 | 29.3 |
+| v1 best (w64, ov256) | +0.099 | 42.83 | 53.96 | 3.21 | 21.0 | 28.4 |
+
+LADDER COMPLETE 2026-07-19. Ship model = **star_v2_e4_512** (+0.508).
+Note the v2 *light* w32 model (+0.202) beats the old v1 *full-width* w64
+model (+0.099) outright - the data-recipe/loss fix outweighs 2x model
+width, which is the cleanest evidence that the v1 failure was never a
+capacity problem.
 
 E1->E4 gained only +0.017 (clean 74.4->76.0%): the crop-512 FFC adaptation
 helps marginally but the DATA RECIPE has plateaued ~76% clean / +0.51. The
