@@ -205,7 +205,7 @@ def main():
                          "checkpoint, so queue retries keep working.")
     ap.add_argument("--out", default="runs")
     # v2 data recipe + loss (defaults). v1 = the shipped recipe/loss.
-    ap.add_argument("--data-recipe", choices=["v1", "v2"], default="v2")
+    ap.add_argument("--data-recipe", choices=["v1", "v2", "v3"], default="v2")
     ap.add_argument("--loss-version", choices=["v1", "v2"], default="v2")
     lc0 = default_loss_cfg()
     for k, v in lc0.items():
@@ -215,7 +215,7 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     run_dir = os.path.join(os.path.dirname(__file__), "..", args.out, args.name)
     os.makedirs(run_dir, exist_ok=True)
-    data_cfg = default_config(1 if args.data_recipe == "v1" else 2)
+    data_cfg = default_config({"v1": 1, "v2": 2, "v3": 3}[args.data_recipe])
     loss_cfg = {k: getattr(args, k) for k in default_loss_cfg()}
     with open(os.path.join(run_dir, "config.json"), "w") as f:
         json.dump(dict(vars(args), data_cfg=data_cfg), f, indent=1)

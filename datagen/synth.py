@@ -39,12 +39,57 @@
 #   8. do-not-remove distractors: galaxy blobs / nebula knots / comet-like
 #      blobs in the background (keep-content).
 #
+# v3 recipe (default_config(3)) — everything v2 does, but the optics, sensor
+# and foreground priors are MEASURED from Andreas's own frames instead of
+# guessed (assets in datagen/v3/, loader in datagen/v3assets.py, findings in
+# datagen/v3/HARVEST_REPORT.md):
+#   1. EMPIRICAL PSF (`real_psf_p`, default 0.60 of images): stars are
+#      splatted with a real orientation-aligned median stamp ("rep_stamp")
+#      picked per field ring (centre/mid/corner) from ONE optical setup, so a
+#      frame keeps a single coherent optical system.  The stamp is resampled
+#      for this frame's seeing/focus (drawn from the group's own measured
+#      p10..p90 FWHM), stretched by any guiding error and rotated onto the
+#      radial axis.  Sub-pixel placement is unchanged: _splat still scatters
+#      bilinear impulses and convolves once, so the ground truth is exactly
+#      the layer that was added.
+#      BRIGHT-STAR LIMITATION (HARVEST_REPORT sec. 6): the stamps are 33x33
+#      and exclude saturated stars, so halos, diffraction spikes and the far
+#      wings of bright stars were never measured.  The stamp buckets are
+#      therefore split:
+#        31 / 63 px stamps (flux <= 300)   -> pure empirical kernel
+#        127 / 255 px stamps (flux > 300)  -> HYBRID: measured core inside a
+#            smoothstep crossfade annulus, v2's analytic PSF (spikes + halo +
+#            far wings), amplitude-matched across the annulus, outside it
+#        saturated "monster" stars         -> fully analytic (render_monsters)
+#   2. SIZE DISTRIBUTION: the analytic branch draws FWHM straight from the
+#      measured per-star distribution (field bin drawn uniformly to undo the
+#      harvest's corner over-sampling), NOT from the stale half-scale
+#      psf_presets.json that gave 50% of v2's images ~2x-too-sharp stars.
+#      Elongation is field-dependent: centre vs corner medians from the data.
+#   3. MEASURED NOISE: always spatially correlated using the measured 9x9
+#      autocorrelation kernel (1/e length ~1.75 px) rather than a random
+#      choice of white/kernel/resample; per-channel sigma(S)=sqrt(a*S+b^2)
+#      anchored on the measured scale-free `sigma_rel` at this image's own
+#      background level; R/G/B mixed through a Cholesky factor of the
+#      measured correlation matrix.  Noise is still added BEFORE presentation
+#      and is IDENTICAL in input and target (removal != denoise).
+#   4. REAL SILHOUETTES: 379+ binary masks harvested from his nightscapes
+#      replace the procedural ridgeline, at the measured rate
+#      (silhouette_p = 0.42), with random flip/zoom/crop.  Stars are still
+#      OCCLUDED by the mask (physics), twilight edge glow and terrestrial
+#      lights are kept.
+#   Every v3 asset is loaded at RUNTIME and every path degrades gracefully to
+#   the v2 behaviour if an asset is missing or mid-rewrite (the harvest keeps
+#   running), so nothing here hardcodes a group/stamp/mask count.
+#
 # default_config(1) reproduces the shipped v1 engine bit-exactly (same RNG
-# consumption order).
+# consumption order); v1 and v2 are byte-for-byte unchanged by the v3 work
+# (regression-tested in train/test_v3.py against frozen pre-v3 hashes).
 #
 # Everything runs in torch (CPU or CUDA) for on-the-fly batch generation.
 
 import math
+import os
 
 import torch
 import torch.nn.functional as F
@@ -63,7 +108,10 @@ def _loguniform(lo, hi, *shape, device="cpu", gen=None):
 # ------------------------------------------------------------------ config
 def default_config(version=2):
     """All data-recipe knobs. version=1 == the shipped v1 engine (bit-exact
-    RNG order); version=2 == the post-forensics recipe (default)."""
+    RNG order); version=2 == the post-forensics recipe (default);
+    version=3 == the REAL-DATA recipe (empirical PSF stamps, measured noise
+    model, real foreground silhouettes — see datagen/v3assets.py and
+    datagen/v3/HARVEST_REPORT.md)."""
     cfg = dict(
         version=version,
         # --- star flux / saturation
@@ -118,6 +166,39 @@ def default_config(version=2):
             neutralize_p=0.0,
             noise="v1", noise_spatial_p=0.0, noise_chan_rho_hi=0.0,
             glow_p=0.0, bg_granular_p=0.0, silhouette_p=0.0, distractor_p=0.0,
+        )
+    if version == 3:
+        # --- v3: everything v2 does, but the optics/sensor/foreground
+        # priors come from MEASURED assets instead of guesses.  Every knob
+        # below degrades gracefully to v2 behaviour when an asset is absent.
+        cfg.update(
+            # empirical PSF: fraction of images whose stars are splatted with
+            # a real measured kernel instead of the analytic Moffat
+            real_psf_p=0.60,
+            emp_seeing_lo=0.75, emp_seeing_hi=1.55,  # per-image focus/seeing
+            # the DELIVERED core is narrower than the nominal FWHM knob
+            # (make_psf blends a sharp diffraction core in for spiked optics,
+            # and the dark-halo profile oversharpens), so the drawn size is
+            # scaled up to land the RENDERED FWHM on the measured
+            # distribution — see eval/coverage_report_v3.py
+            psf_delivered_gain=1.12,
+            emp_hybrid_min_stamp=127,   # >= this stamp bucket -> empirical
+                                        # core + ANALYTIC wings/halo/spikes
+            emp_core_frac=0.55,         # crossfade inner radius / support
+            # analytic branch: drive sizes from the MEASURED FWHM
+            # distribution (psf_index/psf_stamps), not the stale half-scale
+            # psf_presets.json.  fwhm_lo/hi are only the last-resort fallback.
+            psf_measured_dist=True,
+            fwhm_lo=1.4, fwhm_hi=7.4,
+            elong_field_measured=True,  # centre vs corner elongation from data
+            # measured noise: always spatially correlated with the measured
+            # 9x9 ACF, per-channel sigma(S) anchored on measured sigma_rel
+            noise="v3", noise_spatial_p=1.0,
+            # real foreground masks
+            real_sil_p=1.0,             # p(use a real mask | image has fg)
+            silhouette_p=0.42,          # measured acceptance rate
+            sil_zoom_lo=0.5, sil_zoom_hi=4.0,
+            sil_fg_lo=0.03, sil_fg_hi=0.85,
         )
     return cfg
 
@@ -231,26 +312,202 @@ def _load_presets():
     return _PRESETS
 
 
+# ------------------------------------------------------------- v3 empirical PSF
+def _v3_assets():
+    """Import the runtime asset loader lazily; None if unavailable."""
+    try:
+        from . import v3assets
+    except ImportError:                      # loaded as a top-level module
+        try:
+            import v3assets                                  # noqa: F401
+        except ImportError:
+            return None
+    except Exception:
+        return None
+    return v3assets
+
+
+def _pick(weights, gen):
+    """Index sampled from a (numpy) weight vector."""
+    import numpy as np
+    c = np.cumsum(np.asarray(weights, dtype=np.float64))
+    u = float(torch.rand(1, generator=gen)) * float(c[-1])
+    return int(np.searchsorted(c, u, side="right").clip(0, len(c) - 1))
+
+
+def _sample_v3_optics(gen, cfg):
+    """Draw this image's optics from the MEASURED library.
+
+    Returns (fwhm, elong_gain, elong_base, real) where `real` is None for the
+    analytic branch, or dict(groups={ring: group_id}, seeing=scale) for the
+    empirical branch.  Returns None if the assets are unavailable (caller
+    then falls back to the v2 sampler)."""
+    import numpy as np
+    m = _v3_assets()
+    A = m.psf_assets() if m is not None else None
+    if A is None or A["n_groups"] < 1:
+        return None
+    use_real = float(torch.rand(1, generator=gen)) < cfg.get("real_psf_p", 0.0)
+
+    # elongation prior by field bin (measured ellipticity -> v2's a/b - 1)
+    def _el(field, dflt):
+        pool = A["pools"].get(field)
+        if pool is None or len(pool[1]) < 8:
+            return dflt
+        e = float(np.median(pool[1]))
+        return float(e / max(1.0 - e, 1e-3))
+
+    el_c = _el("center", 0.16) * float(_rand(0.75, 1.30, 1, gen=gen))
+    el_k = _el("corner", 0.33) * float(_rand(0.75, 1.30, 1, gen=gen))
+    elong_base = el_c
+    elong_gain = max(el_k - el_c, 0.0) / 0.83      # r_mid of the corner ring
+
+    si = _pick(A["setup_w"], gen)
+    setup = A["setups"][si]
+    bins = A["by_setup"][setup]
+    gain = float(cfg.get("psf_delivered_gain", 1.0))
+    seeing = float(_rand(cfg.get("emp_seeing_lo", 0.75),
+                         cfg.get("emp_seeing_hi", 1.55), 1, gen=gen)) * gain
+    if use_real:
+        groups, meds, p10s, p90s = {}, [], [], []
+        for ring, field in enumerate(("center", "mid", "corner")):
+            lst = bins.get(field) or bins.get("corner") or bins.get("center") \
+                or bins.get("mid") or []
+            if not lst:
+                lst = list(range(A["n_groups"]))
+            gid = lst[int(torch.randint(0, len(lst), (1,),
+                                        generator=gen).item())]
+            groups[ring] = int(gid)
+            meds.append(float(A["g_fwhm"][gid]))
+            p10s.append(float(A["g_fwhm_p10"][gid]))
+            p90s.append(float(A["g_fwhm_p90"][gid]))
+        med = float(np.median(meds))
+        # a rep_stamp is a group MEDIAN kernel, so resampling it by a flat
+        # multiplier would collapse the real intra-group spread (different
+        # nights/focus in one shoot).  Draw this frame's FWHM from the
+        # group's own measured p10..med..p90 instead and derive the scale.
+        u = float(torch.rand(1, generator=gen))
+        tgt = _qlog(u, float(np.median(p10s)), med, float(np.median(p90s)))
+        seeing = min(max(seeing * tgt / max(med, 1e-3), 0.45), 3.0)
+        fwhm = med * seeing
+        # the rep_stamp already CARRIES the group's real ellipticity and
+        # orientation, so no extra analytic stretch (would double-count)
+        return (max(fwhm, 0.8), 0.0, 0.0,
+                dict(groups=groups, seeing=seeing))
+
+    # analytic branch: FWHM straight from the measured stamp distribution,
+    # field bin drawn UNIFORMLY (the harvest samples 1 centre + 4 corner
+    # windows per frame, so the pooled array is corner-biased by construction)
+    fields = [f for f in ("center", "mid", "corner") if f in A["pools"]]
+    if fields:
+        f = fields[int(torch.randint(0, len(fields), (1,),
+                                     generator=gen).item())]
+        arr = A["pools"][f][0]
+        i = int(torch.randint(0, len(arr), (1,), generator=gen).item())
+        fwhm = float(arr[i]) * float(_rand(0.9, 1.15, 1, gen=gen)) * gain
+    else:
+        fwhm = float(_loguniform(cfg["fwhm_lo"], cfg["fwhm_hi"], 1, gen=gen))
+    return max(fwhm, 0.8), elong_gain, elong_base, None
+
+
+def _emp_kernel(A, gid, ch, size, scale, elong, theta, device):
+    """Resample a measured rep_stamp into a `size`x`size` unit-flux kernel.
+
+    * `scale`   > 1 = fatter stars (seeing/focus varies between frames);
+    * `elong`   extra a/b-1 stretch along `theta` (guiding error only — the
+                stamp's own ellipticity is already baked in);
+    * `theta`   rotation of the stamp's major axis (rep_stamps are stored
+                orientation-aligned to +x, so this puts the real elongation
+                on the physically correct radial axis).
+    Sub-pixel placement is NOT done here: _splat still scatters bilinear
+    impulses and convolves, so sub-pixel centring is preserved exactly."""
+    rep = A["rep"]
+    if gid >= rep.shape[0]:
+        return None
+    src = rep[gid, ch].to(device)[None, None]
+    s = src.shape[-1]
+    ax = torch.arange(size, device=device, dtype=torch.float32) \
+        - (size - 1) / 2.0
+    vv, uu = torch.meshgrid(ax, ax, indexing="ij")
+    ct, st = math.cos(theta), math.sin(theta)
+    xr = uu * ct + vv * st
+    yr = -uu * st + vv * ct
+    sx = max(scale * (1.0 + max(elong, 0.0)), 1e-3)
+    sy = max(scale, 1e-3)
+    half = (s - 1) / 2.0
+    gx = (xr / sx) / half
+    gy = (yr / sy) / half
+    grid = torch.stack([gx, gy], dim=-1)[None]
+    k = F.grid_sample(src, grid, mode="bilinear", padding_mode="zeros",
+                      align_corners=True)[0, 0]
+    tot = k.sum()
+    if not torch.isfinite(tot) or float(tot.abs()) < 1e-8:
+        return None
+    return k / tot
+
+
+def _hybrid_kernel(emp, ana, scale, elong, core_frac):
+    """Empirical CORE + analytic WINGS for the bright stamp buckets.
+
+    The harvest's stamps are 33x33 and exclude saturated stars, so halos,
+    diffraction spikes and the far wings of bright stars are simply NOT in
+    the library (HARVEST_REPORT sec. 6).  For big stamps we therefore keep
+    the measured core and hand the outside back to the v2 analytic PSF,
+    amplitude-matched across a smooth radial crossfade annulus."""
+    size = emp.shape[-1]
+    dev = emp.device
+    ax = torch.arange(size, device=dev, dtype=torch.float32) - (size - 1) / 2.0
+    yy, xx = torch.meshgrid(ax, ax, indexing="ij")
+    r = torch.hypot(xx, yy)
+    sup = 16.0 * max(scale, 1e-3) * (1.0 + max(elong, 0.0))
+    r_out = min(0.92 * sup, size / 2.0 - 1.0)
+    r_in = max(core_frac * r_out, 2.0)
+    if r_out <= r_in + 0.5:
+        return ana
+    ann = (r >= r_in) & (r <= r_out)
+    se = float(emp[ann].mean()) if bool(ann.any()) else 0.0
+    sa = float(ana[ann].mean()) if bool(ann.any()) else 0.0
+    if not (math.isfinite(se) and math.isfinite(sa)) or se <= 0 or sa <= 0:
+        return ana
+    t = ((r - r_in) / (r_out - r_in)).clamp(0, 1)
+    w = t * t * (3 - 2 * t)                      # smoothstep
+    k = (1 - w) * emp + w * (ana * (se / sa))
+    tot = k.sum()
+    if not torch.isfinite(tot) or float(tot.abs()) < 1e-8:
+        return ana
+    return k / tot
+
+
 def sample_psf_family(gen, device, cfg=None):
     """One optical system per training image (shared by all its stars).
     50% of the time anchor on a REAL calibrated preset (Andreas's lenses:
-    undersampled FWHM ~1.5-1.9px, elongation 0.24-0.43) with jitter."""
+    undersampled FWHM ~1.5-1.9px, elongation 0.24-0.43) with jitter.
+    v3: sizes/elongation come from the MEASURED library, and ~real_psf_p of
+    images get real empirical kernels (fam["real"])."""
     v2 = cfg is not None and cfg.get("version", 1) != 1
+    v3 = cfg is not None and cfg.get("version", 1) == 3
     presets = _load_presets()
     kind = torch.randint(0, 4, (1,), generator=gen).item()
-    if presets and torch.rand(1, generator=gen).item() < 0.5:
+    v3o = _sample_v3_optics(gen, cfg) if v3 else None
+    if v3o is not None:
+        fwhm, elong, elong_base, real = v3o
+    elif presets and torch.rand(1, generator=gen).item() < 0.5:
         pr = presets[torch.randint(0, len(presets), (1,), generator=gen).item()]
         fwhm = pr["fwhm_med"] * _rand(0.85, 1.35, 1, gen=gen).item()
         elong = max(pr["elong_corner"], pr["elong_center"]) \
             * _rand(0.7, 1.3, 1, gen=gen).item()
+        elong_base, real = 0.0, None
     else:
         f_lo = cfg["fwhm_lo"] if v2 else 1.4
         f_hi = cfg["fwhm_hi"] if v2 else 9.0
         fwhm = _loguniform(f_lo, f_hi, 1, gen=gen).item()
         elong = _rand(0.0, 0.45, 1, gen=gen).item()
+        elong_base, real = 0.0, None
     fam = dict(
         fwhm=fwhm,
         elong=elong,                       # field-varying elongation strength
+        elong_base=elong_base,             # v3: centre-of-field elongation
+        real=real,                         # v3: empirical kernel group map
         beta=_rand(1.8, 4.5, 1, gen=gen).item(),
         theta0=_rand(0, math.pi, 1, gen=gen).item(),
         spike_frac=0.0, n_vanes=0, vane_width=0.0, rotation=0.0,
@@ -325,12 +582,23 @@ def sample_star_field(h, w, gen, device, cfg=None):
 
 
 def render_stars(h, w, fam, pos, flux, color, gen, device,
-                 flux_scale=1e-4, geom=None, halo_min_stamp=127):
+                 flux_scale=1e-4, geom=None, halo_min_stamp=127, cfg=None):
     """Render the linear star image (3,H,W). Field-varying PSF: elongation
     grows toward corners, oriented radially (coma/astigmatism-like).
     geom=dict(cx, cy, rmax) decouples the optical center from the crop center
-    (virtual full-frame geometry); None -> crop center (v1)."""
+    (virtual full-frame geometry); None -> crop center (v1).
+    v3: when fam["real"] is set, the per-(ring, channel) kernel is a MEASURED
+    rep_stamp (hybridised with the analytic PSF for the bright buckets)."""
     out = torch.zeros(3, h, w, device=device)
+    real = fam.get("real")
+    A_psf, kcache = None, {}
+    hybrid_min = (cfg or {}).get("emp_hybrid_min_stamp", 127)
+    core_frac = (cfg or {}).get("emp_core_frac", 0.55)
+    if real is not None:
+        m = _v3_assets()
+        A_psf = m.psf_assets() if m is not None else None
+        if A_psf is None:
+            real = None                       # assets vanished -> analytic
     n = len(pos)
     if n == 0:
         return out
@@ -358,7 +626,8 @@ def render_stars(h, w, fam, pos, flux, color, gen, device,
             if len(sel) == 0:
                 continue
             rmid = (r_lo + r_hi) / 2.0
-            el_r = fam["elong"] * rmid                  # radial elongation
+            el_r = fam.get("elong_base", 0.0) \
+                + fam["elong"] * rmid                   # radial elongation
             # radial orientation: mean angle of the ring group
             mean_theta = math.atan2(
                 float((pos[sel, 1] - cy).mean()), float((pos[sel, 0] - cx).mean()))
@@ -380,7 +649,24 @@ def render_stars(h, w, fam, pos, flux, color, gen, device,
                          defocus_r=fam.get("defocus_r", 0.0),
                          dark_halo_k=fam.get("dark_halo_k", 0.0),
                          dark_halo_s=fam.get("dark_halo_s", 0.0))
-                psf = make_psf(size, p, device)
+                psf = None
+                if real is not None:
+                    ck = (ring, ch, size)
+                    psf = kcache.get(ck)
+                    if psf is None:
+                        gid = real["groups"].get(ring, 0)
+                        emp = _emp_kernel(A_psf, gid, ch, size,
+                                          real["seeing"], el, theta_use,
+                                          device)
+                        if emp is not None and size >= hybrid_min:
+                            # bright bucket: measured core, ANALYTIC wings
+                            emp = _hybrid_kernel(emp, make_psf(size, p, device),
+                                                 real["seeing"], el, core_frac)
+                        psf = emp
+                        if psf is not None:
+                            kcache[ck] = psf
+                if psf is None:
+                    psf = make_psf(size, p, device)
                 p_ch = pos[sel]
                 if chan_shift is not None:              # RGB misregistration
                     p_ch = p_ch + torch.tensor(chan_shift[ch], device=device)
@@ -534,6 +820,15 @@ def render_silhouette(h, w, gen, device, cfg):
         ridge = torch.where(keep, torch.minimum(ridge, cand), ridge)
     yy = torch.arange(h, device=device, dtype=torch.float32)[:, None]
     mask = (yy - ridge[None, :] + 1.0).clamp(0, 1)[None]     # 1px feather
+    fg, glow = _dress_silhouette(h, w, ridge, gen, device)
+    return mask, fg, glow
+
+
+def _dress_silhouette(h, w, ridge, gen, device):
+    """Foreground plate (+ terrestrial point lights, keep-content) and the
+    twilight edge glow above the ridge. Shared by the procedural v2 ridgeline
+    and the v3 real masks; RNG order is unchanged from v2."""
+    yy = torch.arange(h, device=device, dtype=torch.float32)[:, None]
     # foreground plate: near-black, slightly tinted + textured
     lvl = float(_loguniform(0.002, 0.04, 1, gen=gen))
     tint = (1.0 + _rand(-0.15, 0.15, 3, gen=gen).to(device))
@@ -573,6 +868,56 @@ def render_silhouette(h, w, gen, device, cfg):
         else:                                           # cold/moon glow
             gcol = torch.tensor([0.65, 0.8, 1.0], device=device)
         glow = ga * gcol[:, None, None] * prof[None]
+    return fg, glow
+
+
+def render_silhouette_real(h, w, gen, device, cfg):
+    """v3: draw a REAL binary foreground mask (379+ harvested from his own
+    nightscapes) instead of the procedural ridgeline+triangles.  Random
+    h-flip, random zoom and random crop give variety; the ridge profile
+    needed by the twilight glow and the terrestrial lights is derived from
+    the mask itself (topmost foreground row per column).
+    Returns (mask, fg, glow) or None -> caller falls back to procedural."""
+    m = _v3_assets()
+    SA = m.sil_assets() if m is not None else None
+    if SA is None or SA["n"] < 1:
+        return None
+    import numpy as np
+    lo = cfg.get("sil_fg_lo", 0.03)
+    hi = cfg.get("sil_fg_hi", 0.85)
+    sel = None
+    for _ in range(6):
+        rec = SA["masks"][int(torch.randint(0, SA["n"], (1,),
+                                            generator=gen).item())]
+        try:
+            arr = m.load_mask(os.path.join(SA["dir"], rec["file"]))
+        except Exception:
+            continue
+        H, W = arr.shape
+        z = float(_loguniform(cfg.get("sil_zoom_lo", 0.5),
+                              cfg.get("sil_zoom_hi", 4.0), 1, gen=gen))
+        ch_ = int(min(max(round(h * z), 16), H))
+        cw_ = int(min(max(round(w * z), 16), W))
+        y0 = int(torch.randint(0, H - ch_ + 1, (1,), generator=gen).item())
+        x0 = int(torch.randint(0, W - cw_ + 1, (1,), generator=gen).item())
+        sub = arr[y0:y0 + ch_, x0:x0 + cw_]
+        f = float(sub.mean())
+        if lo <= f <= hi:
+            sel = sub
+            break
+    if sel is None:
+        return None
+    t = torch.from_numpy(np.ascontiguousarray(sel)).float() \
+        .to(device)[None, None]
+    if torch.rand(1, generator=gen).item() < 0.5:
+        t = torch.flip(t, dims=[3])
+    t = F.interpolate(t, size=(h, w), mode="bilinear", align_corners=False)
+    mask = t[0].clamp(0, 1)                      # (1,H,W), soft 1px edge
+    hard = (mask[0] >= 0.5)
+    any_col = hard.any(dim=0)
+    ridge = torch.where(any_col, hard.float().argmax(dim=0).float(),
+                        torch.full((w,), float(h), device=device))
+    fg, glow = _dress_silhouette(h, w, ridge, gen, device)
     return mask, fg, glow
 
 
@@ -655,10 +1000,78 @@ def add_noise(img, gen, device):
     return img + torch.randn(img.shape, generator=gen).to(device) * sigma
 
 
-def sample_noise_params(gen, cfg):
-    """Sample the per-image noise model (v2). Drawn BEFORE the image is
+def _qlog(u, lo, md, hi):
+    """Log-linear interpolation through the measured (p10, med, p90) anchors."""
+    lo, md, hi = max(lo, 1e-12), max(md, 1e-12), max(hi, 1e-12)
+    u = min(max(u, 0.02), 0.98)
+    if u <= 0.5:
+        t = (u - 0.1) / 0.4
+        a, b = math.log(lo), math.log(md)
+    else:
+        t = (u - 0.5) / 0.4
+        a, b = math.log(md), math.log(hi)
+    return math.exp(a + (b - a) * t)
+
+
+def _sample_noise_v3(gen, cfg, NA, ref_level):
+    """Per-image noise drawn from the MEASURED model (noise_model.json).
+
+    * amplitude anchored on the measured `sigma_rel` (sigma at the background
+      / background level — the only scale-free, cross-frame comparable
+      figure) evaluated at this image's actual background level;
+    * signal dependence keeps the measured per-channel `a` slope, with `b`
+      solved so sigma at the background lands exactly on the drawn sigma_rel;
+    * texture is ALWAYS the measured 9x9 autocorrelation kernel (his stacks
+      are correlated in every frame measured, 1/e length ~1.75 px);
+    * channels mixed through a Cholesky factor of the measured R/G/B
+      correlation matrix (not v2's single shared-component scalar)."""
+    import numpy as np
+    S = float(max(ref_level if ref_level is not None else 0.02, 1e-3))
+    u = float(torch.rand(1, generator=gen))          # common noise-level quantile
+    ua = float(torch.rand(1, generator=gen))         # common shot-slope quantile
+    a_v, b_v = [], []
+    for c in range(3):
+        s_lo, s_md, s_hi = NA["sigma_rel"][c]
+        sig = _qlog(u, s_lo, s_md, s_hi) \
+            * float(_rand(0.85, 1.18, 1, gen=gen)) * S
+        a_lo, a_md, a_hi = NA["a"][c]
+        a = _qlog(ua, a_lo, a_md, a_hi) * float(_rand(0.6, 1.6, 1, gen=gen))
+        var = sig * sig
+        shot = a * S
+        if shot > 0.9 * var:                 # keep a read floor present
+            a *= (0.9 * var) / max(shot, 1e-30)
+            shot = 0.9 * var
+        a_v.append(a)
+        b_v.append(math.sqrt(max(var - shot, 0.0)))
+    # channel correlation matrix from the measured medians, jittered, PSD-fixed
+    r = NA["rho"]
+    j = [float(_rand(0.4, 1.5, 1, gen=gen)) for _ in range(3)]
+    rg = min(max(r["rg"] * j[0], -0.9), 0.95)
+    rb = min(max(r["rb"] * j[1], -0.9), 0.95)
+    gb = min(max(r["gb"] * j[2], -0.9), 0.95)
+    M = np.array([[1.0, rg, rb], [rg, 1.0, gb], [rb, gb, 1.0]])
+    ev, evec = np.linalg.eigh(M)
+    M = evec @ np.diag(np.clip(ev, 1e-4, None)) @ evec.T
+    d = np.sqrt(np.diag(M))
+    M = M / np.outer(d, d)                   # renormalise to unit variance
+    L = np.linalg.cholesky(M)
+    return dict(a=torch.tensor(a_v, dtype=torch.float32)[:, None, None],
+                b=torch.tensor(b_v, dtype=torch.float32)[:, None, None],
+                rho=0.0, spatial="acf", ksigma=NA["ksigma"], factor=1.0,
+                chol=torch.from_numpy(L).float(), kernel=NA["kernel"])
+
+
+def sample_noise_params(gen, cfg, ref_level=None):
+    """Sample the per-image noise model (v2/v3). Drawn BEFORE the image is
     assembled so sigma is known to the glow renderer and can be returned to
-    the training loop (the loss needs local sigma)."""
+    the training loop (the loss needs local sigma). `ref_level` = the
+    background level the v3 measured sigma_rel is anchored on."""
+    if cfg.get("noise") == "v3":
+        m = _v3_assets()
+        NA = m.noise_assets() if m is not None else None
+        if NA is not None and NA["kernel"] is not None:
+            return _sample_noise_v3(gen, cfg, NA, ref_level)
+        # assets missing -> fall through to the v2 sampler
     p = dict(
         a=float(_loguniform(cfg["noise_a_lo"], cfg["noise_a_hi"], 1, gen=gen)),
         b=float(_loguniform(cfg["noise_b_lo"], cfg["noise_b_hi"], 1, gen=gen)),
@@ -682,15 +1095,31 @@ def apply_noise(img, params, gen, device):
     variance-preserving so the returned sigma map stays exact.
     Returns (noisy, sigma) — sigma in linear units."""
     c, h, w = img.shape
-    sigma = torch.sqrt(params["a"] * img.clamp_min(0) + params["b"] ** 2)
+    pa, pb = params["a"], params["b"]
+    if torch.is_tensor(pa):                     # v3: per-channel (3,1,1)
+        pa, pb = pa.to(device), pb.to(device)
+    sigma = torch.sqrt(pa * img.clamp_min(0) + pb ** 2)
     n_ind = torch.randn(c, h, w, generator=gen).to(device)
+    chol = params.get("chol")
+    if chol is not None:                        # v3: measured R/G/B mixing
+        n_ind = torch.einsum("ij,jhw->ihw", chol.to(device), n_ind)
     if params["rho"] > 0:
         n_sh = torch.randn(1, h, w, generator=gen).to(device)
         r = params["rho"]
         n = math.sqrt(1.0 - r) * n_ind + math.sqrt(r) * n_sh
     else:
         n = n_ind
-    if params["spatial"] == "kernel":
+    if params["spatial"] == "acf":
+        # measured 9x9 grain: k is built so (k star k) == the measured
+        # autocorrelation and sum(k^2) == 1, i.e. the marginal std (and hence
+        # the returned sigma map) is preserved exactly.
+        k = params["kernel"].to(device)
+        ks = k.shape[-1]
+        p2 = ks // 2
+        x = F.pad(n[None], (p2, p2, p2, p2), mode="reflect")
+        n = F.conv2d(x, k.view(1, 1, ks, ks).expand(c, 1, ks, ks),
+                     groups=c)[0]
+    elif params["spatial"] == "kernel":
         s = params["ksigma"]
         k = int(2 * math.ceil(2.5 * s) + 1)
         ax = torch.arange(k, device=device) - (k - 1) / 2.0
@@ -856,7 +1285,9 @@ def _make_pair_v2(h, w, background, gen, device, cfg):
     else:
         bg = background.to(device)
     fam = sample_psf_family(gen, device, cfg)
-    nz = sample_noise_params(gen, cfg)          # noise model known up front
+    # v3 anchors the measured sigma_rel on this image's actual background
+    nz = sample_noise_params(gen, cfg, ref_level=float(bg.median())
+                             if cfg.get("noise") == "v3" else None)
     # saturation level (per-channel jitter -> color-fringed clipped rims)
     sat = _rand(cfg["sat_lo"], cfg["sat_hi"], 1, gen=gen).to(device)
     if cfg["sat_chan_jitter"] > 0:
@@ -873,7 +1304,9 @@ def _make_pair_v2(h, w, background, gen, device, cfg):
     if cfg["glow_p"] > 0 \
             and torch.rand(1, generator=gen).item() < cfg["glow_p"]:
         med = float(bg.median())
-        sigma0 = math.sqrt(nz["a"] * max(med, 0.0) + nz["b"] ** 2)
+        na = float(nz["a"].mean()) if torch.is_tensor(nz["a"]) else nz["a"]
+        nb = float(nz["b"].mean()) if torch.is_tensor(nz["b"]) else nz["b"]
+        sigma0 = math.sqrt(na * max(med, 0.0) + nb ** 2)
         bg = bg + render_unresolved_glow(h, w, fam, gen, device, cfg, sigma0)
 
     # ---- field geometry: virtual full frame, crop somewhere inside it
@@ -891,7 +1324,7 @@ def _make_pair_v2(h, w, background, gen, device, cfg):
     pos, flux, color = sample_star_field(h, w, gen, device, cfg)
     stars_lin = render_stars(h, w, fam, pos, flux, color, gen, device,
                              flux_scale=cfg["flux_scale"], geom=geom,
-                             halo_min_stamp=cfg["halo_min_stamp"])
+                             halo_min_stamp=cfg["halo_min_stamp"], cfg=cfg)
     has_monster = False
     if cfg["monster_p"] > 0 \
             and torch.rand(1, generator=gen).item() < cfg["monster_p"]:
@@ -901,10 +1334,17 @@ def _make_pair_v2(h, w, background, gen, device, cfg):
 
     # ---- foreground silhouette OCCLUDES the star layer (physics fix)
     mask = torch.zeros(1, h, w, device=device)
-    has_sil = False
+    has_sil = sil_real = False
     if cfg["silhouette_p"] > 0 \
             and torch.rand(1, generator=gen).item() < cfg["silhouette_p"]:
-        mask, fg, sglow = render_silhouette(h, w, gen, device, cfg)
+        got, sil_real = None, False
+        if cfg.get("real_sil_p", 0.0) > 0 \
+                and torch.rand(1, generator=gen).item() < cfg["real_sil_p"]:
+            got = render_silhouette_real(h, w, gen, device, cfg)   # v3
+            sil_real = got is not None
+        if got is None:                       # assets missing -> procedural
+            got = render_silhouette(h, w, gen, device, cfg)
+        mask, fg, sglow = got
         bg = (bg + sglow) * (1.0 - mask) + fg * mask
         stars_lin = stars_lin * (1.0 - mask)
         has_sil = True
@@ -926,7 +1366,10 @@ def _make_pair_v2(h, w, background, gen, device, cfg):
                 starless_lin=starless_lin, stars_lin=stars_lin,
                 sigma_lin=sigma_lin, noisy=noisy, noise=noise,
                 starless_noisy=starless_noisy, T=T, mask=mask,
-                flags=dict(monster=has_monster, silhouette=has_sil))
+                flags=dict(monster=has_monster, silhouette=has_sil,
+                           real_sil=sil_real, real_psf=fam.get("real")
+                           is not None,
+                           noise_acf=nz.get("spatial") == "acf"))
 
 
 def make_pair(h, w, background, seed, device="cuda", cfg=None,
