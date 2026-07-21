@@ -19,6 +19,7 @@ def analyze(path):
     img = load_any(path)
     lum = np.ascontiguousarray(img.mean(axis=0), dtype=np.float32)
     h, w = lum.shape
+    step = 1
     if max(h, w) > 4000:                       # analysis doesn't need full res
         step = int(np.ceil(max(h, w) / 4000))
         lum = np.ascontiguousarray(lum[::step, ::step])
@@ -37,7 +38,12 @@ def analyze(path):
     x, y = objs["x"][ok], objs["y"][ok]
     if len(a) < 30:
         return None
-    fwhm = 2.3548 * np.sqrt(a * b)
+    # BUG FIX 2026-07-19: FWHM is measured on the DOWN-SAMPLED image but was
+    # written out (and consumed by sample_psf_family) as full-res pixels, so
+    # every preset from a >4000px frame was 1/step too narrow. On his 7008px
+    # frames step=2, i.e. presets said ~1.7px when his stars measure ~3.26px
+    # full-res. Half of v2's training images drew from these presets.
+    fwhm = 2.3548 * np.sqrt(a * b) * step
     r = np.hypot(x - w / 2, y - h / 2) / np.hypot(w / 2, h / 2)
     center = r < 0.35
     corner = r > 0.7
