@@ -9,7 +9,8 @@ queue of 2 experiments
 ## star_v3_e2_512: ok (1.8 h)
 - export: ok
 - eval: {"psnr_in": 40.75, "psnr_out": 67.71, "leak": 0.0, "recomp": 150.82, "completeness": {"faint": 0.8609, "mid": 0.9749, "bright": 0.9897}, "data_recipe": "v3", "panels": ["panel_DS.tif", "panel_Stacked.tif", "panel_7IV01626.tif", "panel_7IV01627.tif", "panel_(1)_20260520113330.tif", "panel_(10
--- queue complete
+
+queue exited 2026-07-22 06:47
 
 latest sample: `runs/star_v3_e2_512/samples/step0020000_s2.tif`
 
