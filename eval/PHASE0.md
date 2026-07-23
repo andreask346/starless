@@ -41,7 +41,9 @@ Scored on the identical census frame. Progress toward the SXT bar:
 | model | score | clean % | artifact % | missed % | artifact med (sigma) | mask leak % |
 |---|---|---|---|---|---|---|
 | SXT AI11 (target) | +0.894 | 97.82 | 1.89 | 0.29 | 7.8 | 42.4 |
-| **v2 E4** (E1 + 20k @512 FFC-adapt) | **+0.508** | 76.01 | 23.36 | 0.63 | 16.1 | 33.1 |
+| **v3 E2** (real PSF/noise/silhouettes, 2026-07-23) | **+0.709** | 90.67 | 9.09 | 0.24 | 10.3 | - |
+| v3 E1 (60k @256, real data) | +0.703 | 89.76 | 9.99 | 0.26 | 11.4 | - |
+| **v2 E4** (E1 + 20k @512 FFC-adapt) | +0.508 | 76.01 | 23.36 | 0.63 | 16.1 | 33.1 |
 | **v2 E1** (60k @256, 2026-07-19) | +0.491 | 74.44 | 24.86 | 0.71 | 16.6 | 34.9 |
 | **v2 w32** (light model, 60k) | +0.202 | 48.63 | 50.38 | 0.99 | 19.0 | 29.3 |
 | v1 best (w64, ov256) | +0.099 | 42.83 | 53.96 | 3.21 | 21.0 | 28.4 |
@@ -53,12 +55,26 @@ width, which is the cleanest evidence that the v1 failure was never a
 capacity problem.
 
 E1->E4 gained only +0.017 (clean 74.4->76.0%): the crop-512 FFC adaptation
-helps marginally but the DATA RECIPE has plateaued ~76% clean / +0.51. The
-remaining ~22-point clean gap to SXT (97.8%) will not close by more of the
-same synthetic recipe - it needs the deferred v3 data levers (real PSF
-stamps from his GM lenses, measured A7RV/A7IV noise spectra, real-silhouette
-harvesting) so the synthetic stars/noise match his sensor. That was always
-the "next iteration after seeing v2 numbers" decision - and this is it.
+helps marginally but the DATA RECIPE plateaued ~76% clean / +0.51. The v3
+data levers closed most of that gap - see below.
+
+## v3 result (real empirical data + the 2x PSF unit-bug fix)
+
+v3 = empirical PSF stamps (55787 real stars -> 251 groups), measured noise
+ACF, 379 real silhouettes, and the calibrate_psf FWHM 2x fix. Fine-tuned
+from v2 E4. Census on the same held-out frame:
+
+  SXT AI11  +0.894  97.8% clean  1.9% artifact  0.29% missed  7.8 sigma
+  v3 E2     +0.709  90.7%        9.1%           0.24%         10.3    <- SHIP
+  v2 E4     +0.508  76.0%        23.4%          0.63%         16.1
+
+v3 closed ~2/3 of the v2->SXT gap (+0.508 -> +0.709) and BEATS SXT on
+missed stars (0.24% vs 0.29%). Remaining gap to SXT is artifact rate
+(9.1% vs 1.9%) and severity (10.3 vs 7.8 sigma) + residual faint stars
+(2973 vs ~900). The rendered star FWHM went from 0.73x reality (v2, the
+unit bug) to 1.06x (v3) - the single biggest lever. Further gains: extend
+empirical stamps past 33px (capture bright-star wings/halos empirically),
+push the loss harder on the artifact/faint bins, harvest more sources.
 
 E1 alone closed ~half the v1->SXT gap. Big wins vs v1: clean 42.8->74.4%,
 artifact 54->25%, missed 3.2->0.71%, artifact severity 21->16.6 sigma. Still

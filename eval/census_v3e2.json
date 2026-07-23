@@ -1,0 +1,218 @@
+{
+ "harness_version": "1.0",
+ "label": "star_v3_e2_512",
+ "input": "E:\\Tenerife_&_La_Palma_June_2026\\Photos\\La_Palma\\Pared De Roberto Path Cygnus\\PI\\Neutralised.tif",
+ "starless": "C:\\Users\\User\\AppData\\Local\\Temp\\claude\\C--Users-User-Documents-For-Claude\\05e466a8-b55e-41f8-8cc3-e60e66cb496d\\scratchpad\\phase0\\out\\starless_Neutralised_v3e2.fit",
+ "starmask": "C:\\Users\\User\\AppData\\Local\\Temp\\claude\\C--Users-User-Documents-For-Claude\\05e466a8-b55e-41f8-8cc3-e60e66cb496d\\scratchpad\\phase0\\out\\starmask_Neutralised_v3e2.fit",
+ "cache": "C:\\Users\\User\\Documents\\For Claude\\starless\\eval\\sites_neutralised.npz",
+ "orientation": {
+  "method": "reconstruction",
+  "recon_err_direct": 1.5712792844624346e-08,
+  "recon_err_flipped": 0.11991632729768753,
+  "flipped": false,
+  "recon_err": 1.5712792844624346e-08
+ },
+ "noise_sigma": 0.0025249032769352198,
+ "detection_thr": 0.03213480859994888,
+ "n_sites_total": 172542,
+ "n_scored": 172542,
+ "subsample": {
+  "max_sites": 0,
+  "seed": 42,
+  "fraction": 1.0
+ },
+ "overall": {
+  "clean": 156438,
+  "artifact": 15692,
+  "missed": 412,
+  "clean_pct": 90.67,
+  "artifact_pct": 9.09,
+  "missed_pct": 0.24
+ },
+ "census_peak": [
+  {
+   "bin": "0.03-0.1",
+   "n": 2059,
+   "clean": 23,
+   "artifact": 1786,
+   "missed": 250,
+   "clean_pct": 1.1,
+   "artifact_pct": 86.7,
+   "missed_pct": 12.1
+  },
+  {
+   "bin": "0.1-0.2",
+   "n": 7737,
+   "clean": 2144,
+   "artifact": 5504,
+   "missed": 89,
+   "clean_pct": 27.7,
+   "artifact_pct": 71.1,
+   "missed_pct": 1.2
+  },
+  {
+   "bin": "0.2-0.35",
+   "n": 25519,
+   "clean": 20502,
+   "artifact": 4963,
+   "missed": 54,
+   "clean_pct": 80.3,
+   "artifact_pct": 19.4,
+   "missed_pct": 0.2
+  },
+  {
+   "bin": "0.35-0.5",
+   "n": 40769,
+   "clean": 38843,
+   "artifact": 1913,
+   "missed": 13,
+   "clean_pct": 95.3,
+   "artifact_pct": 4.7,
+   "missed_pct": 0.0
+  },
+  {
+   "bin": "0.5-0.65",
+   "n": 78486,
+   "clean": 77080,
+   "artifact": 1401,
+   "missed": 5,
+   "clean_pct": 98.2,
+   "artifact_pct": 1.8,
+   "missed_pct": 0.0
+  },
+  {
+   "bin": ">0.65",
+   "n": 17972,
+   "clean": 17846,
+   "artifact": 125,
+   "missed": 1,
+   "clean_pct": 99.3,
+   "artifact_pct": 0.7,
+   "missed_pct": 0.0
+  }
+ ],
+ "census_fwhm": [
+  {
+   "bin": "<1.5",
+   "n": 18954,
+   "clean": 18125,
+   "artifact": 827,
+   "missed": 2,
+   "clean_pct": 95.6,
+   "artifact_pct": 4.4,
+   "missed_pct": 0.0
+  },
+  {
+   "bin": "1.5-2",
+   "n": 86593,
+   "clean": 82169,
+   "artifact": 4418,
+   "missed": 6,
+   "clean_pct": 94.9,
+   "artifact_pct": 5.1,
+   "missed_pct": 0.0
+  },
+  {
+   "bin": "2-3",
+   "n": 56049,
+   "clean": 49818,
+   "artifact": 6208,
+   "missed": 23,
+   "clean_pct": 88.9,
+   "artifact_pct": 11.1,
+   "missed_pct": 0.0
+  },
+  {
+   "bin": "3-4",
+   "n": 8054,
+   "clean": 5411,
+   "artifact": 2596,
+   "missed": 47,
+   "clean_pct": 67.2,
+   "artifact_pct": 32.2,
+   "missed_pct": 0.6
+  },
+  {
+   "bin": "4-6",
+   "n": 2538,
+   "clean": 883,
+   "artifact": 1502,
+   "missed": 153,
+   "clean_pct": 34.8,
+   "artifact_pct": 59.2,
+   "missed_pct": 6.0
+  },
+  {
+   "bin": "6-10",
+   "n": 273,
+   "clean": 31,
+   "artifact": 131,
+   "missed": 111,
+   "clean_pct": 11.4,
+   "artifact_pct": 48.0,
+   "missed_pct": 40.7
+  },
+  {
+   "bin": ">10",
+   "n": 81,
+   "clean": 1,
+   "artifact": 10,
+   "missed": 70,
+   "clean_pct": 1.2,
+   "artifact_pct": 12.3,
+   "missed_pct": 86.4
+  }
+ ],
+ "artifact_types": {
+  "bright_residual+color": 1481,
+  "ring+color": 323,
+  "bright_residual": 5791,
+  "ring": 2922,
+  "dark_hole": 4216,
+  "dark_hole+color": 959
+ },
+ "artifact_amp_sigma": {
+  "median": 10.34,
+  "p75": 14.42,
+  "p95": 23.12
+ },
+ "dark_hole": {
+  "count": 5175,
+  "frac_of_artifacts": 0.3298,
+  "median_depth_sigma": 11.9
+ },
+ "missed": {
+  "count": 412,
+  "median_peak": 0.0816,
+  "median_fwhm": 5.53,
+  "resfrac_pct": {
+   "25": 0.61217,
+   "50": 0.78181,
+   "75": 1.16734,
+   "95": 1.84734
+  }
+ },
+ "residual_stars": {
+  "count_in_scored": 2973,
+  "estimated_total": 2973,
+  "definition": "sites with starless residual peak (rmax) > input detection threshold"
+ },
+ "score": 0.7092,
+ "score_weights": {
+  "<0.03": 0.25,
+  "0.03-0.1": 0.5,
+  "0.1-0.2": 0.75,
+  "0.2-0.35": 1.0,
+  "0.35-0.5": 1.25,
+  "0.5-0.65": 1.5,
+  ">0.65": 2.0
+ },
+ "runtime_sec": 7.5,
+ "mask_smooth_leak": {
+  "smooth_leak_fraction": 0.44421544671058655,
+  "smooth_mean": 0.009913686662912369,
+  "smooth_p99": 0.05856188386678696,
+  "smooth_max": 0.14089201390743256,
+  "smooth_frac_gt_0p01": 0.3346767099831113
+ }
+}
